@@ -1,14 +1,14 @@
-import StubPage from '@/components/layout/stub-page'
-import { FileText } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
+import LogsClient from '@/components/logs/logs-client'
 
-export default function LogsPage() {
-  return (
-    <StubPage
-      title="Logs"
-      description="Registro diário de conversas, objeções, wins e losses. Alimenta o dashboard de métricas e o copilot com dados reais."
-      icon={FileText}
-      phase="Fase 3"
-      accessLabel="Closer · Gestor"
-    />
-  )
+export default async function LogsPage() {
+  let userId: string | undefined
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    userId = user?.id
+  } catch {
+    /* Supabase not configured */
+  }
+  return <LogsClient userId={userId} />
 }

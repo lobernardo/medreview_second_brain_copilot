@@ -1,13 +1,14 @@
-import StubPage from '@/components/layout/stub-page'
-import { LayoutDashboard } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
+import DashboardClient from '@/components/dashboard/dashboard-client'
 
-export default function DashboardPage() {
-  return (
-    <StubPage
-      title="Dashboard"
-      description="Métricas e resumo do time comercial — wins, objeções frequentes, leads ativos e performance da semana."
-      icon={LayoutDashboard}
-      phase="Fase 3"
-    />
-  )
+export default async function DashboardPage() {
+  let userId: string | undefined
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    userId = user?.id
+  } catch {
+    /* Supabase not configured */
+  }
+  return <DashboardClient userId={userId} />
 }
