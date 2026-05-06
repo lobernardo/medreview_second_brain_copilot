@@ -173,7 +173,7 @@ export default function FaqPage() {
   const canCreate = role === 'closer' || role === 'gestor'
 
   const TABS = [
-    { id: 'interno' as const, label: 'Interno', count: faqs.filter(f => f.faq_type === 'interno').length },
+    { id: 'interno' as const, label: 'Comercial', count: faqs.filter(f => f.faq_type === 'interno').length },
     { id: 'cliente' as const, label: 'Clientes', count: faqs.filter(f => f.faq_type === 'cliente').length },
   ]
 
@@ -290,7 +290,7 @@ export default function FaqPage() {
                 <div className="flex gap-2">
                   {(['interno', 'cliente'] as const).map(t => (
                     <button key={t} onClick={() => setForm(p => ({ ...p, faq_type: t }))} className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${form.faq_type === t ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                      {t === 'interno' ? 'Interno' : 'Clientes'}
+                      {t === 'interno' ? 'Comercial' : 'Clientes'}
                     </button>
                   ))}
                 </div>

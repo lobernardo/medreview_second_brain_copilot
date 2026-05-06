@@ -15,6 +15,7 @@ import {
   Settings,
   Menu,
   X,
+  MessageSquareText,
 } from 'lucide-react'
 import type { Profile } from '@/lib/utils/types'
 
@@ -30,12 +31,13 @@ const ALL_ITEMS: Record<string, NavItem> = {
   vendas:     { href: '/copilot-vendas',    label: 'Vendas',      icon: Bot },
   onboarding: { href: '/copilot-onboarding', label: 'Onboarding', icon: GraduationCap },
   copys:      { href: '/copys',             label: 'Copys',       icon: Mail },
-  leads:      { href: '/leads',             label: 'Leads',       icon: NotebookPen },
+  leads:      { href: '/leads',             label: 'Radar',       icon: NotebookPen },
+  templates:  { href: '/templates',         label: 'Templates',   icon: MessageSquareText },
   faq:        { href: '/faq',               label: 'FAQ',         icon: HelpCircle },
   objecoes:   { href: '/objecoes',          label: 'Objeções',    icon: Shield },
   kb:         { href: '/kb',                label: 'KB',          icon: BookOpen },
   config:     { href: '/onboarding-config', label: 'Config',      icon: Settings2 },
-  settings:   { href: '/settings',          label: 'Config',     icon: Settings },
+  settings:   { href: '/settings',          label: 'Config',      icon: Settings },
 }
 
 const BOTTOM_ITEMS: Record<Role, string[]> = {
@@ -45,9 +47,9 @@ const BOTTOM_ITEMS: Record<Role, string[]> = {
 }
 
 const DRAWER_ITEMS: Record<Role, string[]> = {
-  closer:     ['objecoes', 'kb', 'settings'],
-  gestor:     ['faq', 'objecoes', 'kb', 'config', 'settings'],
-  onboarding: ['objecoes'],
+  closer:     ['templates', 'objecoes', 'kb', 'settings'],
+  gestor:     ['templates', 'faq', 'objecoes', 'kb', 'config', 'settings'],
+  onboarding: [],
 }
 
 export default function MobileNav({ profile }: { profile: Profile | null }) {
