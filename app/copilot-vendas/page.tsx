@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Send, Copy, ThumbsUp, ThumbsDown, Check, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
@@ -47,8 +48,9 @@ function useSupabaseUser() {
   return userId
 }
 
-export default function CopilotVendasPage() {
+function CopilotVendasContent() {
   const userId = useSupabaseUser()
+  const searchParams = useSearchParams()
   const [mode, setMode] = useState<ModeId>('livre')
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -57,6 +59,7 @@ export default function CopilotVendasPage() {
   const [sources, setSources] = useState<Source[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const autoSentRef = useRef(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -69,20 +72,21 @@ export default function CopilotVendasPage() {
     el.style.height = Math.min(el.scrollHeight, 160) + 'px'
   }
 
-  const sendMessage = useCallback(async () => {
-    const text = input.trim()
+  const sendMessage = useCallback(async (overrideText?: string, overrideMode?: ModeId) => {
+    const text = (overrideText ?? input).trim()
+    const activeMode = overrideMode ?? mode
     if (!text || streaming) return
 
-    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text, mode }
+    if (!overrideText) {
+      setInput('')
+      if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    }
+
+    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text, mode: activeMode }
     setMessages((prev) => [...prev, userMsg])
-    setInput('')
-    if (textareaRef.current) textareaRef.current.style.height = 'auto'
 
     const assistantId = crypto.randomUUID()
-    setMessages((prev) => [
-      ...prev,
-      { id: assistantId, role: 'assistant', content: '', mode },
-    ])
+    setMessages((prev) => [...prev, { id: assistantId, role: 'assistant', content: '', mode: activeMode }])
     setStreaming(true)
 
     try {
@@ -94,7 +98,7 @@ export default function CopilotVendasPage() {
       const res = await fetch('/api/copilot-vendas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, mode, user_id: userId, messages: history }),
+        body: JSON.stringify({ message: text, mode: activeMode, user_id: userId, messages: history }),
       })
 
       if (!res.ok) throw new Error(`API error ${res.status}`)
@@ -127,9 +131,7 @@ export default function CopilotVendasPage() {
             if (delta) {
               accumulated += delta
               setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantId ? { ...m, content: accumulated } : m
-                )
+                prev.map((m) => m.id === assistantId ? { ...m, content: accumulated } : m)
               )
             }
           } catch {
@@ -149,6 +151,28 @@ export default function CopilotVendasPage() {
       setStreaming(false)
     }
   }, [input, mode, messages, streaming, userId])
+
+  // Auto-send lead context from query params (e.g. coming from /leads)
+  useEffect(() => {
+    if (!userId || autoSentRef.current) return
+    const lead = searchParams.get('lead')
+    if (!lead) return
+    autoSentRef.current = true
+
+    const vertical = searchParams.get('vertical')
+    const produto = searchParams.get('produto')
+    const objecao = searchParams.get('objecao')
+
+    const parts: string[] = [`Lead: ${lead}`]
+    if (vertical) parts.push(`Vertical: ${vertical}`)
+    if (produto) parts.push(`Produto: ${produto}`)
+    if (objecao) parts.push(`Objeção: ${objecao}`)
+
+    const text = `Contexto do lead — ${parts.join(' | ')}\n\nMe ajuda a diagnosticar e preparar uma abordagem para este lead.`
+    setMode('diagnose')
+    sendMessage(text, 'diagnose')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -236,7 +260,7 @@ export default function CopilotVendasPage() {
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.role === 'user' ? (
               <div
-                className="max-w-[75%] px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm leading-relaxed text-indigo-900"
+                className="max-w-[75%] px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm leading-relaxed text-indigo-900 whitespace-pre-wrap"
                 style={{ background: '#EEF2FF' }}
               >
                 {msg.content}
@@ -354,7 +378,7 @@ export default function CopilotVendasPage() {
             disabled={streaming}
           />
           <button
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             disabled={!input.trim() || streaming}
             className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 disabled:opacity-40"
             style={{ background: input.trim() && !streaming ? '#6366F1' : '#D1D5DB' }}
@@ -371,5 +395,13 @@ export default function CopilotVendasPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function CopilotVendasPage() {
+  return (
+    <Suspense fallback={null}>
+      <CopilotVendasContent />
+    </Suspense>
   )
 }

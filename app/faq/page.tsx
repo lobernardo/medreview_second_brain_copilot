@@ -132,7 +132,7 @@ export default function FaqPage() {
         const { data, error } = await supabase.from('faq_items').insert(full).select('id').single()
         if (error) throw error
         savedId = data.id
-        setFaqs(prev => [{ ...full, id: savedId } as FaqItem, ...prev])
+        setFaqs(prev => [{ ...full, id: savedId, created_at: new Date().toISOString() } as FaqItem, ...prev])
       }
       fetch('/api/embeddings', {
         method: 'POST',
