@@ -3,19 +3,17 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard,
   Bot,
   GraduationCap,
-  Flame,
-  FileText,
+  NotebookPen,
   Mail,
   HelpCircle,
   Shield,
   BookOpen,
-  Target,
   Settings2,
   Settings,
 } from 'lucide-react'
+
 import type { Profile } from '@/lib/utils/types'
 
 type Role = 'closer' | 'gestor' | 'onboarding'
@@ -28,16 +26,13 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/copilot-vendas', label: 'Copilot Vendas', icon: Bot, roles: ['closer', 'gestor'] },
   { href: '/copilot-onboarding', label: 'Copilot Onboarding', icon: GraduationCap, roles: ['onboarding', 'gestor'] },
-  { href: '/leads', label: 'Leads quentes', icon: Flame, roles: ['closer', 'gestor'] },
-  { href: '/logs', label: 'Logs', icon: FileText, roles: ['closer', 'gestor'] },
+  { href: '/leads', label: 'Meus Leads', icon: NotebookPen, roles: ['closer', 'gestor'] },
   { href: '/copys', label: 'Copys', icon: Mail, roles: ['closer', 'gestor'] },
   { href: '/faq', label: 'FAQ', icon: HelpCircle, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/objecoes', label: 'Objeções', icon: Shield, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/kb', label: 'Knowledge Base', icon: BookOpen, roles: ['closer', 'gestor', 'onboarding'] },
-  { href: '/priorities', label: 'Prioridades', icon: Target, roles: ['gestor'] },
   { href: '/onboarding-config', label: 'Config Onboarding', icon: Settings2, roles: ['gestor'] },
   { href: '/settings', label: 'Configurações', icon: Settings, roles: ['closer', 'gestor', 'onboarding'] },
 ]

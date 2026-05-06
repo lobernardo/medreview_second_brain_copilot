@@ -1,12 +1,12 @@
 import StubPage from '@/components/layout/stub-page'
-import { Flame } from 'lucide-react'
+import { NotebookPen } from 'lucide-react'
 
 export default function LeadsPage() {
   return (
     <StubPage
-      title="Leads Quentes"
-      description="Pipeline de leads em andamento — verticais, estágio, próxima ação e histórico de contato. Integrado ao CRM."
-      icon={Flame}
+      title="Meus Leads"
+      description="Bloco de notas dos seus leads — anotações rápidas de contexto, próximas ações e histórico de contato. Simples e direto."
+      icon={NotebookPen}
       phase="Fase 9"
       accessLabel="Closer · Gestor"
     />

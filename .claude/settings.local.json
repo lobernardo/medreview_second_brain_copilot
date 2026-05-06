@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(taskkill *)",
+      "PowerShell(Stop-Process *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\leool\\\\projetos\\\\copilot-medreview\\\\app\" -Recurse -File)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Recurse -Path \"app\" -Filter \"*.tsx\")",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "PowerShell(Get-ChildItem -Recurse -Path \"C:\\\\Users\\\\leool\\\\projetos\\\\copilot-medreview\\\\app\" | Where-Object { $_.Extension -in '.tsx','.ts' } | Select-Object FullName | Sort-Object FullName | Format-Table -AutoSize)"
+    ]
+  }
+}

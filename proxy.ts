@@ -30,7 +30,7 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const isLoginPage = request.nextUrl.pathname === '/login'
-  const isRoot = request.nextUrl.pathname === '/'
+  const isIndexRoute = ['/'].includes(request.nextUrl.pathname)
 
   if (!user && !isLoginPage) {
     const url = request.nextUrl.clone()
@@ -38,9 +38,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (user && (isLoginPage || isRoot)) {
+  if (user && (isLoginPage || isIndexRoute)) {
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    url.pathname = '/copilot-vendas'
     return NextResponse.redirect(url)
   }
 
