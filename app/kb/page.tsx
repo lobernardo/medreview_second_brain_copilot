@@ -7,6 +7,8 @@ import remarkGfm from 'remark-gfm'
 import { Plus, Edit2, Trash2, X, Upload, Eye, Code, BookOpen, Loader2, Search, AlertCircle } from 'lucide-react'
 import { VerticalBadge } from '@/components/ui/badge'
 import { VERTICALS } from '@/lib/utils/constants'
+import { SkeletonGrid } from '@/components/ui/skeleton'
+import { Toast } from '@/components/ui/toast'
 
 const KB_CATEGORIES = [
   { value: 'produto', label: 'Produto', color: '#3B82F6', bg: '#EFF6FF' },
@@ -65,6 +67,7 @@ export default function KbPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -187,6 +190,7 @@ export default function KbPage() {
         body: JSON.stringify({ table: 'knowledge_base', id: savedId, content: `${form.title}\n\n${form.content}` }),
       }).catch(() => {})
       closeModal()
+      setToast({ type: 'success', message: editingDoc ? 'Documento atualizado.' : 'Documento criado.' })
     } catch {
       setSaveError('Erro ao salvar. Tente novamente.')
     } finally {
@@ -198,7 +202,10 @@ export default function KbPage() {
     try {
       await supabase.from('knowledge_base').update({ is_active: false }).eq('id', id)
       setDocs(prev => prev.filter(d => d.id !== id))
-    } catch {}
+      setToast({ type: 'success', message: 'Documento removido.' })
+    } catch {
+      setToast({ type: 'error', message: 'Erro ao remover documento.' })
+    }
     setConfirmDeleteId(null)
   }
 
@@ -266,12 +273,9 @@ export default function KbPage() {
         )}
       </div>
 
-      {loading && (
-        <div className="flex items-center justify-center py-16 text-gray-400 gap-2">
-          <Loader2 size={18} className="animate-spin" />
-          <span className="text-sm">Carregando documentos...</span>
-        </div>
-      )}
+      {toast && <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
+
+      {loading && <SkeletonGrid count={6} />}
 
       {!loading && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center">

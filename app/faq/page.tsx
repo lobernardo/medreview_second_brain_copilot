@@ -6,6 +6,8 @@ import { Plus, Check, Edit2, Trash2, X, AlertCircle, Loader2, Search } from 'luc
 import { VerticalBadge } from '@/components/ui/badge'
 import { VERTICALS } from '@/lib/utils/constants'
 import type { Profile } from '@/lib/utils/types'
+import { SkeletonList } from '@/components/ui/skeleton'
+import { Toast } from '@/components/ui/toast'
 
 const STATUS_CFG = {
   rascunho: { color: '#F59E0B', bg: '#FFFBEB', label: 'Rascunho' },
@@ -58,6 +60,7 @@ export default function FaqPage() {
   const [form, setForm] = useState<FaqForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -140,6 +143,7 @@ export default function FaqPage() {
         body: JSON.stringify({ table: 'faq_items', id: savedId, content: `${form.question} ${form.answer}` }),
       }).catch(() => {})
       setModalOpen(false)
+      setToast({ type: 'success', message: editingFaq ? 'FAQ atualizada.' : 'FAQ criada.' })
     } catch { setSaveError('Erro ao salvar. Tente novamente.') } finally { setSaving(false) }
   }
 
@@ -148,14 +152,20 @@ export default function FaqPage() {
     try {
       await supabase.from('faq_items').update({ status: newStatus, validated_by: newStatus === 'validado' ? profile?.id ?? null : null }).eq('id', faq.id)
       setFaqs(prev => prev.map(f => f.id === faq.id ? { ...f, status: newStatus } : f))
-    } catch {}
+      setToast({ type: 'success', message: newStatus === 'validado' ? 'FAQ validada.' : 'Marcada como rascunho.' })
+    } catch {
+      setToast({ type: 'error', message: 'Erro ao atualizar status.' })
+    }
   }
 
   async function handleDelete(id: string) {
     try {
       await supabase.from('faq_items').update({ is_active: false }).eq('id', id)
       setFaqs(prev => prev.filter(f => f.id !== id))
-    } catch {}
+      setToast({ type: 'success', message: 'FAQ removida.' })
+    } catch {
+      setToast({ type: 'error', message: 'Erro ao remover FAQ.' })
+    }
     setConfirmDeleteId(null)
   }
 
@@ -211,7 +221,9 @@ export default function FaqPage() {
         )}
       </div>
 
-      {loading && <div className="flex items-center justify-center py-16 text-gray-400 gap-2"><Loader2 size={18} className="animate-spin" /><span className="text-sm">Carregando...</span></div>}
+      {toast && <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
+
+      {loading && <SkeletonList count={5} />}
 
       {!loading && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center">

@@ -5,6 +5,8 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Plus, Copy, Edit2, Trash2, X, Eye, Search, Check, Loader2, AlertCircle } from 'lucide-react'
 import { VerticalBadge } from '@/components/ui/badge'
 import type { Profile } from '@/lib/utils/types'
+import { SkeletonGrid } from '@/components/ui/skeleton'
+import { Toast } from '@/components/ui/toast'
 
 const COPY_CATEGORIES = [
   { value: 'abertura', label: 'Abertura' },
@@ -101,6 +103,7 @@ export default function CopysPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [previewCopy, setPreviewCopy] = useState<CopyItem | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -210,6 +213,7 @@ export default function CopysPage() {
         body: JSON.stringify({ table: 'user_copys', id: savedId, content: `${form.title} ${form.message_text}` }),
       }).catch(() => {})
       closeModal()
+      setToast({ type: 'success', message: editingCopy ? 'Copy atualizada.' : 'Copy criada.' })
     } catch { setSaveError('Erro ao salvar. Tente novamente.') } finally { setSaving(false) }
   }
 
@@ -218,7 +222,10 @@ export default function CopysPage() {
       await supabase.from('user_copys').update({ is_active: false }).eq('id', id)
       setMyCopys(prev => prev.filter(c => c.id !== id))
       setTeamCopys(prev => prev.filter(c => c.id !== id))
-    } catch {}
+      setToast({ type: 'success', message: 'Copy removida.' })
+    } catch {
+      setToast({ type: 'error', message: 'Erro ao remover copy.' })
+    }
     setConfirmDeleteId(null)
   }
 
@@ -323,9 +330,11 @@ export default function CopysPage() {
         ))}
       </div>
 
+      {toast && <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
+
       {activeTab === 'minhas' && (
         loading ? (
-          <div className="flex items-center justify-center py-16 text-gray-400 gap-2"><Loader2 size={18} className="animate-spin" /><span className="text-sm">Carregando...</span></div>
+          <SkeletonGrid count={6} />
         ) : myCopys.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <p className="text-gray-500 text-sm">Você ainda não tem copys.</p>

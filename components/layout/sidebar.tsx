@@ -31,7 +31,7 @@ const navItems: NavItem[] = [
   { href: '/leads', label: 'Meus Leads', icon: NotebookPen, roles: ['closer', 'gestor'] },
   { href: '/copys', label: 'Copys', icon: Mail, roles: ['closer', 'gestor'] },
   { href: '/faq', label: 'FAQ', icon: HelpCircle, roles: ['closer', 'gestor', 'onboarding'] },
-  { href: '/objecoes', label: 'Objeções', icon: Shield, roles: ['closer', 'gestor', 'onboarding'] },
+  { href: '/objecoes', label: 'Objeções', icon: Shield, roles: ['closer', 'gestor'] },
   { href: '/kb', label: 'Knowledge Base', icon: BookOpen, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/onboarding-config', label: 'Config Onboarding', icon: Settings2, roles: ['gestor'] },
   { href: '/settings', label: 'Configurações', icon: Settings, roles: ['closer', 'gestor', 'onboarding'] },

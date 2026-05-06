@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Plus, Edit2, Trash2, X, Loader2, AlertCircle, Bot, Phone, FileText, ChevronRight } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, AlertCircle, Loader2, Bot, Phone, FileText, ChevronRight } from 'lucide-react'
 import { VerticalBadge } from '@/components/ui/badge'
 import { useRouter } from 'next/navigation'
+import { SkeletonGrid } from '@/components/ui/skeleton'
+import { Toast } from '@/components/ui/toast'
 
 const VERTICALS = ['R1', 'Anest', 'Oft', 'Ortop']
 
@@ -53,6 +55,7 @@ export default function LeadsPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -117,6 +120,7 @@ export default function LeadsPage() {
         setLeads(prev => [data as Lead, ...prev])
       }
       closeModal()
+      setToast({ type: 'success', message: editingLead ? 'Lead atualizado.' : 'Lead adicionado.' })
     } catch { setSaveError('Erro ao salvar. Tente novamente.') } finally { setSaving(false) }
   }
 
@@ -124,7 +128,10 @@ export default function LeadsPage() {
     try {
       await supabase.from('meus_leads').delete().eq('id', id)
       setLeads(prev => prev.filter(l => l.id !== id))
-    } catch {}
+      setToast({ type: 'success', message: 'Lead removido.' })
+    } catch {
+      setToast({ type: 'error', message: 'Erro ao remover lead.' })
+    }
     setConfirmDeleteId(null)
   }
 
@@ -153,11 +160,10 @@ export default function LeadsPage() {
         </button>
       </div>
 
+      {toast && <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
+
       {loading ? (
-        <div className="flex items-center justify-center py-20 gap-2 text-gray-400">
-          <Loader2 size={18} className="animate-spin" />
-          <span className="text-sm">Carregando...</span>
-        </div>
+        <SkeletonGrid count={6} />
       ) : leads.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: '#EEF2FF' }}>

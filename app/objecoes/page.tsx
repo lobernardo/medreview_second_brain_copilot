@@ -5,6 +5,8 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Plus, Edit2, Trash2, X, AlertCircle, Loader2, Search, ShieldAlert } from 'lucide-react'
 import { VerticalBadge } from '@/components/ui/badge'
 import { VERTICALS } from '@/lib/utils/constants'
+import { SkeletonGrid } from '@/components/ui/skeleton'
+import { Toast } from '@/components/ui/toast'
 
 interface ObjPattern {
   id: string
@@ -62,6 +64,7 @@ export default function ObjEcoesPage() {
   const [form, setForm] = useState<ObjForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -137,11 +140,18 @@ export default function ObjEcoesPage() {
         body: JSON.stringify({ table: 'objection_patterns', id: savedId, content: [form.topic, form.definition, form.real_meaning, form.recommended_response].filter(Boolean).join(' ') }),
       }).catch(() => {})
       setModalOpen(false)
+      setToast({ type: 'success', message: editingObj ? 'Objeção atualizada.' : 'Objeção criada.' })
     } catch { setSaveError('Erro ao salvar. Tente novamente.') } finally { setSaving(false) }
   }
 
   async function handleDelete(id: string) {
-    try { await supabase.from('objection_patterns').delete().eq('id', id); setObjs(prev => prev.filter(o => o.id !== id)) } catch {}
+    try {
+      await supabase.from('objection_patterns').delete().eq('id', id)
+      setObjs(prev => prev.filter(o => o.id !== id))
+      setToast({ type: 'success', message: 'Objeção removida.' })
+    } catch {
+      setToast({ type: 'error', message: 'Erro ao remover objeção.' })
+    }
     setConfirmDeleteId(null)
   }
 
@@ -173,7 +183,9 @@ export default function ObjEcoesPage() {
         {(filterSearch || filterVertical) && <button onClick={() => { setFilterSearch(''); setFilterVertical('') }} className="px-3 py-2 border rounded-lg text-sm text-gray-500 hover:bg-gray-50 bg-white" style={{ borderColor: '#E5E7EB' }}>Limpar</button>}
       </div>
 
-      {loading && <div className="flex items-center justify-center py-16 text-gray-400 gap-2"><Loader2 size={18} className="animate-spin" /><span className="text-sm">Carregando...</span></div>}
+      {toast && <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
+
+      {loading && <SkeletonGrid count={4} cols={2} />}
 
       {!loading && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center">

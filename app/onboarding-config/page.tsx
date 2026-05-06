@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { Plus, Trash2, GripVertical, Save, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { SkeletonForm } from '@/components/ui/skeleton'
 import type { TrailItem } from '@/lib/ai/onboarding-prompt'
 
 const TONE_OPTIONS = [
@@ -139,9 +140,9 @@ export default function OnboardingConfigPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] text-gray-400 gap-2">
-        <Loader2 size={18} className="animate-spin" />
-        <span className="text-sm">Carregando configurações...</span>
+      <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+        <SkeletonForm />
+        <SkeletonForm />
       </div>
     )
   }

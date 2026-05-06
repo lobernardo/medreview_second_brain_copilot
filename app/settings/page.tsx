@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { Loader2, Save } from 'lucide-react'
 import { Toast } from '@/components/ui/toast'
+import { SkeletonForm } from '@/components/ui/skeleton'
 import type { Profile } from '@/lib/utils/types'
 
 const VERTICALS = ['R1', 'Anest', 'Oft', 'Ortop']
@@ -81,9 +82,9 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 gap-2 text-gray-400">
-        <Loader2 size={18} className="animate-spin" />
-        <span className="text-sm">Carregando...</span>
+      <div className="space-y-6 max-w-xl">
+        <SkeletonForm />
+        <SkeletonForm />
       </div>
     )
   }
