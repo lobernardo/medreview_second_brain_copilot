@@ -7,8 +7,8 @@ import type { Profile } from '@/lib/utils/types'
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
-  '/copilot-vendas': 'Second Brain Vendas',
-  '/copilot-onboarding': 'Second Brain Onboarding',
+  '/copilot-vendas': 'Copilot Vendas',
+  '/copilot-onboarding': 'Copilot Onboarding',
   '/leads': 'No Radar',
   '/logs': 'Logs',
   '/copys': 'Copys & Macros',
