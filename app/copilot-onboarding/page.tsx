@@ -184,7 +184,7 @@ export default function CopilotOnboardingPage() {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
-              ? { ...m, content: 'Erro ao conectar com o Copilot. Tente novamente.' }
+              ? { ...m, content: 'Erro ao conectar com o Second Brain. Tente novamente.' }
               : m
           )
         )
@@ -373,7 +373,7 @@ export default function CopilotOnboardingPage() {
           className="w-full flex items-center justify-between px-4 py-2 text-[11px] text-gray-400 hover:text-gray-500 hover:bg-gray-50 transition-colors"
         >
           <span>
-            Copilot Onboarding
+            Second Brain Onboarding
             {sources.length > 0 && (
               <> · <span className="text-indigo-500">{sources.length} fonte{sources.length !== 1 ? 's' : ''} RAG</span></>
             )}

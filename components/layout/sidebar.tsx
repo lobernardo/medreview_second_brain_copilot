@@ -27,8 +27,8 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/copilot-vendas', label: 'Copilot Vendas', icon: Bot, roles: ['closer', 'gestor'] },
-  { href: '/copilot-onboarding', label: 'Copilot Onboarding', icon: GraduationCap, roles: ['onboarding', 'gestor'] },
+  { href: '/copilot-vendas', label: 'Second Brain Vendas', icon: Bot, roles: ['closer', 'gestor'] },
+  { href: '/copilot-onboarding', label: 'Second Brain Onboarding', icon: GraduationCap, roles: ['onboarding', 'gestor'] },
   { href: '/leads', label: 'No Radar', icon: NotebookPen, roles: ['closer', 'gestor'] },
   { href: '/copys', label: 'Copys', icon: Mail, roles: ['closer', 'gestor'] },
   { href: '/templates', label: 'Templates', icon: MessageSquareText, roles: ['closer', 'gestor'] },
@@ -60,7 +60,7 @@ export default function Sidebar({ profile }: SidebarProps) {
           Med-Review
         </div>
         <div className="text-indigo-300 text-[11px] font-medium tracking-[0.2em] uppercase mt-0.5">
-          Copilot
+          Second Brain
         </div>
       </div>
 

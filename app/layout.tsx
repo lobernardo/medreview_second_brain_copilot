@@ -6,7 +6,7 @@ import AppShell from '@/components/layout/app-shell'
 import type { Profile } from '@/lib/utils/types'
 
 export const metadata: Metadata = {
-  title: 'Med-Review Copilot',
+  title: 'Med-Review Second Brain',
   description: 'Sistema interno de inteligência comercial',
 }
 

@@ -7,8 +7,8 @@ import type { Profile } from '@/lib/utils/types'
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
-  '/copilot-vendas': 'Copilot Vendas',
-  '/copilot-onboarding': 'Copilot Onboarding',
+  '/copilot-vendas': 'Second Brain Vendas',
+  '/copilot-onboarding': 'Second Brain Onboarding',
   '/leads': 'No Radar',
   '/logs': 'Logs',
   '/copys': 'Copys & Macros',
@@ -32,7 +32,7 @@ export default function Header({ user, profile }: HeaderProps) {
   const router = useRouter()
   const supabase = createClient()
 
-  const title = pageTitles[pathname] || 'Med-Review Copilot'
+  const title = pageTitles[pathname] || 'Med-Review Second Brain'
   const displayName = profile?.name || user?.email || ''
 
   async function handleSignOut() {

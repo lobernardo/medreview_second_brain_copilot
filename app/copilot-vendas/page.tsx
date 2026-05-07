@@ -143,7 +143,7 @@ function CopilotVendasContent() {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
-            ? { ...m, content: 'Erro ao conectar com o Copilot. Tente novamente.' }
+            ? { ...m, content: 'Erro ao conectar com o Second Brain. Tente novamente.' }
             : m
         )
       )
@@ -228,7 +228,7 @@ function CopilotVendasContent() {
             >
               <span className="text-2xl">🤖</span>
             </div>
-            <h2 className="text-lg font-semibold text-gray-800 mb-1">Copilot de Vendas</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">Second Brain de Vendas</h2>
             <p className="text-sm text-gray-500 max-w-xs">
               Seu segundo cérebro em tempo real. Selecione um modo e comece a conversa.
             </p>

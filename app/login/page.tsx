@@ -121,7 +121,7 @@ export default function LoginPage() {
   const VIEWS: Record<View, { title: string; subtitle: string }> = {
     login:  { title: 'Bem-vindo de volta',   subtitle: 'Entre com suas credenciais para continuar' },
     reset:  { title: 'Recuperar senha',       subtitle: 'Enviaremos um link para redefinir sua senha' },
-    signup: { title: 'Criar conta',           subtitle: 'Preencha os dados para acessar o Copilot' },
+    signup: { title: 'Criar conta',           subtitle: 'Preencha os dados para acessar o Second Brain' },
   }
 
   return (
@@ -139,7 +139,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-[22px] font-bold text-[#111827] tracking-tight">Med-Review</h1>
           <p className="text-xs font-semibold tracking-[0.2em] uppercase mt-1" style={{ color: '#6366F1' }}>
-            Copilot
+            Second Brain
           </p>
         </div>
 

@@ -28,8 +28,8 @@ interface NavItem {
 }
 
 const ALL_ITEMS: Record<string, NavItem> = {
-  vendas:     { href: '/copilot-vendas',    label: 'Vendas',      icon: Bot },
-  onboarding: { href: '/copilot-onboarding', label: 'Onboarding', icon: GraduationCap },
+  vendas:     { href: '/copilot-vendas',    label: 'SB Vendas',   icon: Bot },
+  onboarding: { href: '/copilot-onboarding', label: 'SB Onboard', icon: GraduationCap },
   copys:      { href: '/copys',             label: 'Copys',       icon: Mail },
   leads:      { href: '/leads',             label: 'Radar',       icon: NotebookPen },
   templates:  { href: '/templates',         label: 'Templates',   icon: MessageSquareText },
