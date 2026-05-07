@@ -9,6 +9,7 @@ import { VerticalBadge } from '@/components/ui/badge'
 import { VERTICALS } from '@/lib/utils/constants'
 import { SkeletonGrid } from '@/components/ui/skeleton'
 import { Toast } from '@/components/ui/toast'
+import { useProfile } from '@/lib/context/profile-context'
 
 const KB_CATEGORIES = [
   { value: 'produto', label: 'Produto', color: '#3B82F6', bg: '#EFF6FF' },
@@ -51,8 +52,8 @@ export default function KbPage() {
     []
   )
 
+  const profile = useProfile()
   const [userId, setUserId] = useState<string | null>(null)
-  const [role, setRole] = useState<string | null>(null)
   const [docs, setDocs] = useState<KbDoc[]>([])
   const [loading, setLoading] = useState(true)
   const [filterCat, setFilterCat] = useState('')
@@ -72,17 +73,9 @@ export default function KbPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    async function load() {
-      try {
-        const { data } = await supabase.auth.getUser()
-        if (data.user) {
-          setUserId(data.user.id)
-          const { data: p } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
-          if (p) setRole(p.role)
-        }
-      } catch {}
-    }
-    load()
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setUserId(data.user.id)
+    }).catch(() => {})
   }, [supabase])
 
   useEffect(() => {
@@ -209,7 +202,7 @@ export default function KbPage() {
     setConfirmDeleteId(null)
   }
 
-  const isGestor = role === 'gestor'
+  const isGestor = profile?.role === 'gestor'
 
   return (
     <div className="space-y-6">

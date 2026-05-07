@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import AppShell from '@/components/layout/app-shell'
 import type { Profile } from '@/lib/utils/types'
 
@@ -23,7 +24,9 @@ export default async function RootLayout({
     user = data.user
 
     if (user) {
-      const { data: profileData } = await supabase
+      // Use admin client to bypass RLS — SELECT policy may not be configured yet.
+      const admin = createAdminClient()
+      const { data: profileData } = await admin
         .from('profiles')
         .select('*')
         .eq('id', user.id)

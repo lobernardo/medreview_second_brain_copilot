@@ -7,6 +7,7 @@ import { VerticalBadge } from '@/components/ui/badge'
 import { VERTICALS } from '@/lib/utils/constants'
 import { SkeletonList } from '@/components/ui/skeleton'
 import { Toast } from '@/components/ui/toast'
+import { useProfile } from '@/lib/context/profile-context'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,8 +70,8 @@ export default function ObjEcoesPage() {
   )
 
   // Auth
-  const [userId, setUserId]     = useState<string | null>(null)
-  const [role, setRole]         = useState<string | null>(null)
+  const profile = useProfile()
+  const [userId, setUserId] = useState<string | null>(null)
 
   // Data
   const [objs, setObjs]         = useState<ObjPattern[]>([])
@@ -97,19 +98,11 @@ export default function ObjEcoesPage() {
   const [saveError, setSaveError]             = useState('')
   const [toast, setToast]                     = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  // ── Load user + role
+  // ── Load userId (for personal responses)
   useEffect(() => {
-    async function load() {
-      try {
-        const { data } = await supabase.auth.getUser()
-        if (data.user) {
-          setUserId(data.user.id)
-          const { data: p } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
-          if (p) setRole(p.role)
-        }
-      } catch {}
-    }
-    load()
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setUserId(data.user.id)
+    }).catch(() => {})
   }, [supabase])
 
   // ── Load objections
@@ -266,7 +259,7 @@ export default function ObjEcoesPage() {
     setConfirmDeleteId(null)
   }
 
-  const isGestor = role === 'gestor'
+  const isGestor = profile?.role === 'gestor'
 
   // ─── JSX ──────────────────────────────────────────────────────────────────
   return (

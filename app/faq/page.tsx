@@ -5,9 +5,9 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Plus, Check, Edit2, Trash2, X, AlertCircle, Loader2, Search } from 'lucide-react'
 import { VerticalBadge } from '@/components/ui/badge'
 import { VERTICALS } from '@/lib/utils/constants'
-import type { Profile } from '@/lib/utils/types'
 import { SkeletonList } from '@/components/ui/skeleton'
 import { Toast } from '@/components/ui/toast'
+import { useProfile } from '@/lib/context/profile-context'
 
 const STATUS_CFG = {
   rascunho: { color: '#F59E0B', bg: '#FFFBEB', label: 'Rascunho' },
@@ -45,8 +45,7 @@ export default function FaqPage() {
     []
   )
 
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [role, setRole] = useState<string | null>(null)
+  const profile = useProfile()
   const [activeTab, setActiveTab] = useState<'interno' | 'cliente'>('interno')
   const [faqs, setFaqs] = useState<FaqItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -62,18 +61,6 @@ export default function FaqPage() {
   const [saveError, setSaveError] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const { data } = await supabase.auth.getUser()
-        if (data.user) {
-          const { data: p } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
-          if (p) { setProfile(p as Profile); setRole(p.role) }
-        }
-      } catch {}
-    }
-    load()
-  }, [supabase])
 
   useEffect(() => {
     async function loadFaqs() {
@@ -169,8 +156,8 @@ export default function FaqPage() {
     setConfirmDeleteId(null)
   }
 
-  const isGestor = role === 'gestor'
-  const canCreate = role === 'closer' || role === 'gestor'
+  const isGestor = profile?.role === 'gestor'
+  const canCreate = profile?.role === 'closer' || profile?.role === 'gestor'
 
   const TABS = [
     { id: 'interno' as const, label: 'Comercial', count: faqs.filter(f => f.faq_type === 'interno').length },

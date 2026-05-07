@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import Sidebar from './sidebar'
 import Header from './header'
 import MobileNav from './mobile-nav'
+import { ProfileProvider } from '@/lib/context/profile-context'
 import type { Profile } from '@/lib/utils/types'
 
 interface AppShellProps {
@@ -22,22 +23,24 @@ export default function AppShell({ user, profile, children }: AppShellProps) {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Sidebar — lg+ */}
-      <div className="hidden lg:flex lg:flex-shrink-0">
-        <Sidebar profile={profile} />
-      </div>
+    <ProfileProvider profile={profile}>
+      <div className="flex h-full overflow-hidden">
+        {/* Sidebar — lg+ */}
+        <div className="hidden lg:flex lg:flex-shrink-0">
+          <Sidebar profile={profile} />
+        </div>
 
-      {/* Main area */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <Header user={user} profile={profile} />
-        <main className="flex-1 overflow-auto bg-[#F9FAFB] p-6 pb-20 lg:pb-6">
-          {children}
-        </main>
-      </div>
+        {/* Main area */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <Header user={user} profile={profile} />
+          <main className="flex-1 overflow-auto bg-[#F9FAFB] p-6 pb-20 lg:pb-6">
+            {children}
+          </main>
+        </div>
 
-      {/* Mobile bottom nav */}
-      <MobileNav profile={profile} />
-    </div>
+        {/* Mobile bottom nav */}
+        <MobileNav profile={profile} />
+      </div>
+    </ProfileProvider>
   )
 }

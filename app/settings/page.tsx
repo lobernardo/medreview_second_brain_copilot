@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Loader2, Save, ChevronRight, ChevronLeft, Check, Pencil } from 'lucide-react'
 import { Toast } from '@/components/ui/toast'
 import { SkeletonForm } from '@/components/ui/skeleton'
+import { useProfile } from '@/lib/context/profile-context'
 import type { Profile } from '@/lib/utils/types'
 
 const VERTICALS = ['R1', 'Anest', 'Oft', 'Ortop']
@@ -258,6 +259,7 @@ export default function SettingsPage() {
     []
   )
 
+  const contextProfile = useProfile()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(true)
@@ -277,52 +279,53 @@ export default function SettingsPage() {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [advancedText, setAdvancedText] = useState('')
 
+  // Initialize form from context profile (server-fetched, always reliable)
   useEffect(() => {
-    async function load() {
-      setLoading(true)
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        setEmail(user.email ?? '')
-        const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-        if (p) {
-          const prof = p as Profile
-          setProfile(prof)
-          setName(prof.name)
-          setVerticalFocus(prof.vertical_focus ?? '')
-          setPhone(prof.phone ?? '')
-          setWhatsappLink(prof.whatsapp_link ?? '')
-          setDefaultGreeting(prof.default_greeting ?? '')
-          const notes = prof.style_notes ?? ''
-          setAdvancedText(notes)
-          setWizard(parseStyleNotes(notes))
-        }
-      } catch {} finally { setLoading(false) }
+    if (contextProfile) {
+      setProfile(contextProfile)
+      setName(contextProfile.name)
+      setVerticalFocus(contextProfile.vertical_focus ?? '')
+      setPhone(contextProfile.phone ?? '')
+      setWhatsappLink(contextProfile.whatsapp_link ?? '')
+      setDefaultGreeting(contextProfile.default_greeting ?? '')
+      const notes = contextProfile.style_notes ?? ''
+      setAdvancedText(notes)
+      setWizard(parseStyleNotes(notes))
+      setLoading(false)
     }
-    load()
-  }, [supabase])
+  }, [contextProfile])
+
+  // Get email from auth session
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setEmail(data.user.email ?? '')
+        if (!contextProfile) setLoading(false)
+      }
+    }).catch(() => { setLoading(false) })
+  }, [supabase, contextProfile])
 
   const currentStyleNotes = showAdvanced ? advancedText : buildStyleNotes(wizard)
 
   async function handleSave() {
-    if (!profile) return
     if (!name.trim()) { setToast({ type: 'error', message: 'Nome não pode ser vazio.' }); return }
     setSaving(true)
     try {
-      await supabase.from('profiles').update({
+      const payload = {
         name: name.trim(),
         vertical_focus: verticalFocus || null,
         phone: phone || null,
         whatsapp_link: whatsappLink || null,
         default_greeting: defaultGreeting || null,
         style_notes: currentStyleNotes || null,
-        updated_at: new Date().toISOString(),
-      }).eq('id', profile.id)
-      setProfile(prev => prev ? {
-        ...prev, name: name.trim(), vertical_focus: verticalFocus || null,
-        phone: phone || null, whatsapp_link: whatsappLink || null,
-        default_greeting: defaultGreeting || null, style_notes: currentStyleNotes || null,
-      } : prev)
+      }
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      setProfile(prev => prev ? { ...prev, ...payload } : prev)
       setToast({ type: 'success', message: 'Perfil atualizado com sucesso!' })
     } catch {
       setToast({ type: 'error', message: 'Erro ao salvar. Tente novamente.' })
