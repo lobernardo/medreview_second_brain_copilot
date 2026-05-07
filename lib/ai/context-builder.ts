@@ -126,6 +126,45 @@ async function matchQuotes(supabase: SupabaseClient, embedding: number[], parts:
   } catch { /* RPC not available yet */ }
 }
 
+async function fetchVerdadeiroValor(supabase: SupabaseClient): Promise<string> {
+  try {
+    const { data: vv } = await supabase
+      .from('verdadeiro_valor')
+      .select('content')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const { data: bns } = await supabase
+      .from('big_numbers')
+      .select('value, label, description, category, vertical')
+      .eq('is_active', true)
+
+    const lines: string[] = []
+
+    if (vv?.content) {
+      lines.push(`VERDADEIRO VALOR DA MED-REVIEW:\n${vv.content}`)
+    }
+
+    if (bns?.length) {
+      const formatted = bns
+        .map((b: any) => {
+          let entry = `• ${b.value} — ${b.label}`
+          if (b.description) entry += `: ${b.description}`
+          if (b.vertical) entry += ` (${b.vertical})`
+          if (b.category) entry += ` [${b.category}]`
+          return entry
+        })
+        .join('\n')
+      lines.push(`BIG NUMBERS:\n${formatted}`)
+    }
+
+    return lines.join('\n\n')
+  } catch {
+    return ''
+  }
+}
+
 async function fallbackTextSearch(
   supabase: SupabaseClient,
   message: string,
@@ -158,10 +197,12 @@ export async function buildContext(
   const parts: string[] = []
   const sources: ContextSource[] = []
 
-  let embedding: number[] | null = null
-  try {
-    embedding = await generateEmbedding(message)
-  } catch { /* OPENAI_API_KEY not active — fall through to text search */ }
+  const [vvBlock, embedding] = await Promise.all([
+    fetchVerdadeiroValor(supabase),
+    generateEmbedding(message).catch(() => null),
+  ])
+
+  if (vvBlock) parts.push(vvBlock)
 
   if (!embedding) {
     await fallbackTextSearch(supabase, message, parts, sources)

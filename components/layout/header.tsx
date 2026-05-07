@@ -17,6 +17,7 @@ const pageTitles: Record<string, string> = {
   '/objecoes': 'Matriz de Objeções',
   '/kb': 'Knowledge Base',
   '/priorities': 'Prioridades',
+  '/verdadeiro-valor': 'Verdadeiro Valor',
   '/onboarding-config': 'Config Onboarding',
   '/settings': 'Configurações',
 }

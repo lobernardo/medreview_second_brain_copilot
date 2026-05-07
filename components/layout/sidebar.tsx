@@ -13,6 +13,7 @@ import {
   Settings2,
   Settings,
   MessageSquareText,
+  Trophy,
 } from 'lucide-react'
 
 import type { Profile } from '@/lib/utils/types'
@@ -29,6 +30,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/copilot-vendas', label: 'Copilot Vendas', icon: Bot, roles: ['closer', 'gestor'] },
   { href: '/copilot-onboarding', label: 'Copilot Onboarding', icon: GraduationCap, roles: ['onboarding', 'gestor'] },
+  { href: '/verdadeiro-valor', label: 'Verdadeiro Valor', icon: Trophy, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/leads', label: 'No Radar', icon: NotebookPen, roles: ['closer', 'gestor'] },
   { href: '/copys', label: 'Copys', icon: Mail, roles: ['closer', 'gestor'] },
   { href: '/templates', label: 'Templates', icon: MessageSquareText, roles: ['closer', 'gestor'] },

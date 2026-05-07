@@ -16,6 +16,7 @@ import {
   Menu,
   X,
   MessageSquareText,
+  Trophy,
 } from 'lucide-react'
 import type { Profile } from '@/lib/utils/types'
 
@@ -36,6 +37,7 @@ const ALL_ITEMS: Record<string, NavItem> = {
   faq:        { href: '/faq',               label: 'FAQ',         icon: HelpCircle },
   objecoes:   { href: '/objecoes',          label: 'Objeções',    icon: Shield },
   kb:         { href: '/kb',                label: 'KB',          icon: BookOpen },
+  valor:      { href: '/verdadeiro-valor',   label: 'Valor',       icon: Trophy },
   config:     { href: '/onboarding-config', label: 'Config',      icon: Settings2 },
   settings:   { href: '/settings',          label: 'Config',      icon: Settings },
 }
@@ -47,9 +49,9 @@ const BOTTOM_ITEMS: Record<Role, string[]> = {
 }
 
 const DRAWER_ITEMS: Record<Role, string[]> = {
-  closer:     ['templates', 'objecoes', 'kb', 'settings'],
-  gestor:     ['templates', 'faq', 'objecoes', 'kb', 'config', 'settings'],
-  onboarding: [],
+  closer:     ['valor', 'templates', 'objecoes', 'kb', 'settings'],
+  gestor:     ['valor', 'templates', 'faq', 'objecoes', 'kb', 'config', 'settings'],
+  onboarding: ['valor'],
 }
 
 export default function MobileNav({ profile }: { profile: Profile | null }) {
