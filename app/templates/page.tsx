@@ -121,7 +121,7 @@ export default function TemplatesPage() {
 
   // ── Load user + role
   useEffect(() => {
-    async function load() {
+    async function loadUser() {
       try {
         const { data } = await supabase.auth.getUser()
         if (data.user) {
@@ -131,41 +131,24 @@ export default function TemplatesPage() {
         }
       } catch {}
     }
-    load()
+    loadUser()
   }, [supabase])
 
-  // ── Load templates
+  // ── Load templates + favorites
   useEffect(() => {
-    async function loadTemplates() {
+    async function load() {
       setLoading(true)
       try {
-        const { data } = await supabase
-          .from('whatsapp_templates')
-          .select('*')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-        setTemplates((data ?? []) as WaTemplate[])
+        const res = await fetch('/api/templates')
+        const json = await res.json()
+        setTemplates((json.templates ?? []) as WaTemplate[])
+        const map: Record<string, FavoriteRow> = {}
+        for (const row of (json.favorites ?? []) as FavoriteRow[]) map[row.template_id] = row
+        setFavorites(map)
       } catch { setTemplates([]) } finally { setLoading(false) }
     }
-    loadTemplates()
-  }, [supabase])
-
-  // ── Load favorites
-  useEffect(() => {
-    if (!userId) return
-    async function loadFavs() {
-      try {
-        const { data } = await supabase
-          .from('user_favorite_templates')
-          .select('*')
-          .eq('user_id', userId)
-        const map: Record<string, FavoriteRow> = {}
-        for (const row of (data ?? []) as FavoriteRow[]) map[row.template_id] = row
-        setFavorites(map)
-      } catch {}
-    }
-    loadFavs()
-  }, [userId, supabase])
+    load()
+  }, [])
 
   // ── Filtered lists
   const filtered = useMemo(() => {

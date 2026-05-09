@@ -107,45 +107,22 @@ export default function CopysPage() {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
-    async function loadMy() {
-      if (!profile) {
-        setLoading(false)
-        return
-      }
+    async function load() {
       setLoading(true)
       try {
-        const { data, error } = await supabase
-          .from('user_copys').select('*')
-          .eq('user_id', profile.id).eq('is_active', true)
-          .order('updated_at', { ascending: false })
-        if (error) console.error('[copys] loadMy error:', error)
-        setMyCopys((data ?? []) as CopyItem[])
-      } catch (e) {
-        console.error('[copys] loadMy catch:', e)
+        const res = await fetch('/api/copys')
+        const json = await res.json()
+        setMyCopys((json.mine ?? []) as CopyItem[])
+        setTeamCopys((json.team ?? []) as CopyItem[])
+      } catch {
         setMyCopys([])
+        setTeamCopys([])
       } finally {
         setLoading(false)
       }
     }
-    loadMy()
-  }, [supabase, profile])
-
-  useEffect(() => {
-    async function loadTeam() {
-      try {
-        const { data, error } = await supabase
-          .from('user_copys').select('*')
-          .eq('is_shared', true).eq('is_active', true)
-          .order('user_name', { ascending: true })
-        if (error) console.error('[copys] loadTeam error:', error)
-        setTeamCopys((data ?? []) as CopyItem[])
-      } catch (e) {
-        console.error('[copys] loadTeam catch:', e)
-        setTeamCopys([])
-      }
-    }
-    loadTeam()
-  }, [supabase])
+    load()
+  }, [])
 
   const searchResults = useMemo(() => {
     if (!searchText.trim()) return []

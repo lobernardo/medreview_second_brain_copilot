@@ -96,17 +96,18 @@ export default function VerdadeiroValorPage() {
   // ── Load data ──
   useEffect(() => {
     async function load() {
-      const [vvRes, bnsRes] = await Promise.all([
-        supabase.from('verdadeiro_valor').select('*').order('updated_at', { ascending: false }).limit(1).maybeSingle(),
-        supabase.from('big_numbers').select('*').eq('is_active', true).order('label'),
-      ])
-      if (vvRes.data) { setVv(vvRes.data); setVvDraft(vvRes.data.content) }
-      if (bnsRes.data) setBns(bnsRes.data)
-      setVvLoading(false)
-      setBnsLoading(false)
+      try {
+        const res = await fetch('/api/verdadeiro-valor')
+        const json = await res.json()
+        if (json.vv) { setVv(json.vv); setVvDraft(json.vv.content) }
+        if (json.bns) setBns(json.bns)
+      } finally {
+        setVvLoading(false)
+        setBnsLoading(false)
+      }
     }
     load()
-  }, [supabase])
+  }, [])
 
   // ── Verdadeiro Valor handlers ──
   async function handleSaveVv() {

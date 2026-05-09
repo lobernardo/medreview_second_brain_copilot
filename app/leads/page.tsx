@@ -61,19 +61,13 @@ export default function LeadsPage() {
     async function load() {
       setLoading(true)
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        setUserId(user.id)
-        const { data } = await supabase
-          .from('meus_leads')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-        setLeads((data ?? []) as Lead[])
+        const res = await fetch('/api/leads')
+        const json = await res.json()
+        setLeads((json.data ?? []) as Lead[])
       } catch { setLeads([]) } finally { setLoading(false) }
     }
     load()
-  }, [supabase])
+  }, [])
 
   function openCreate() {
     setEditingLead(null); setForm(EMPTY_FORM); setSaveError(''); setModalOpen(true)

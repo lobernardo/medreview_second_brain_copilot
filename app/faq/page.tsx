@@ -66,16 +66,13 @@ export default function FaqPage() {
     async function loadFaqs() {
       setLoading(true)
       try {
-        const { data } = await supabase
-          .from('faq_items')
-          .select('id,faq_type,question,answer,vertical,category,created_by,created_by_name,status,validated_by,is_active,created_at')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-        setFaqs((data ?? []) as FaqItem[])
+        const res = await fetch('/api/faq')
+        const json = await res.json()
+        setFaqs((json.data ?? []) as FaqItem[])
       } catch { setFaqs([]) } finally { setLoading(false) }
     }
     loadFaqs()
-  }, [supabase])
+  }, [])
 
   const filtered = faqs.filter(f => {
     if (f.faq_type !== activeTab) return false

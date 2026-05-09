@@ -107,16 +107,13 @@ export default function KbPage() {
     async function loadDocs() {
       setLoading(true)
       try {
-        const { data } = await supabase
-          .from('knowledge_base')
-          .select('id,title,category,vertical,content,tags,source_type,is_active,updated_at,updated_by')
-          .eq('is_active', true)
-          .order('updated_at', { ascending: false })
-        setDocs((data ?? []) as KbDoc[])
+        const res = await fetch('/api/kb')
+        const json = await res.json()
+        setDocs((json.data ?? []) as KbDoc[])
       } catch { setDocs([]) } finally { setLoading(false) }
     }
     loadDocs()
-  }, [supabase])
+  }, [])
 
   // ── Filters ─────────────────────────────────────────────────────────────────
 

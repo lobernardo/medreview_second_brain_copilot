@@ -98,49 +98,26 @@ export default function ObjEcoesPage() {
   const [saveError, setSaveError]             = useState('')
   const [toast, setToast]                     = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  // ── Load userId (for personal responses)
+  // ── Load objections + personal responses
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setUserId(data.user.id)
-    }).catch(() => {})
-  }, [supabase])
-
-  // ── Load objections
-  useEffect(() => {
-    async function loadObjs() {
+    async function load() {
       setLoading(true)
       try {
-        const { data } = await supabase
-          .from('objection_patterns')
-          .select('id,topic,definition,real_meaning,vertical,recommended_response,what_not_to_say,proof_points,times_seen_total,win_rate,updated_at')
-          .order('times_seen_total', { ascending: false })
-        setObjs((data ?? []) as ObjPattern[])
-      } catch { setObjs([]) } finally { setLoading(false) }
-    }
-    loadObjs()
-  }, [supabase])
-
-  // ── Load personal responses after userId is set
-  useEffect(() => {
-    if (!userId) return
-    async function load() {
-      try {
-        const { data } = await supabase
-          .from('user_objection_responses')
-          .select('*')
-          .eq('user_id', userId)
+        const res = await fetch('/api/objecoes')
+        const json = await res.json()
+        setObjs((json.patterns ?? []) as ObjPattern[])
         const map: Record<string, UserObjResponse> = {}
         const texts: Record<string, string> = {}
-        for (const r of (data ?? []) as UserObjResponse[]) {
+        for (const r of (json.responses ?? []) as UserObjResponse[]) {
           map[r.objection_id] = r
           texts[r.objection_id] = r.response_text
         }
         setPersonalResponses(map)
         setResponseTexts(texts)
-      } catch {}
+      } catch { setObjs([]) } finally { setLoading(false) }
     }
     load()
-  }, [userId, supabase])
+  }, [])
 
   // ── Filtered list
   const filtered = useMemo(() => objs.filter(o => {
