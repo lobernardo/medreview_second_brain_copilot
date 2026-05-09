@@ -185,7 +185,7 @@ export default function VerdadeiroValorPage() {
         const res = await fetch('/api/big-numbers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...payload, is_active: true }),
+          body: JSON.stringify(payload),
         })
         const json = await res.json()
         if (!res.ok) throw new Error(json.error)
