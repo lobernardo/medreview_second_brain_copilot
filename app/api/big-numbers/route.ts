@@ -13,11 +13,11 @@ export async function POST(request: Request) {
     const admin = createAdminClient()
 
     if (id) {
-      const { error } = await admin.from('big_numbers').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', id)
+      const { error } = await admin.from('big_numbers').update(payload).eq('id', id)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ success: true, data: { id } })
     } else {
-      const { data, error } = await admin.from('big_numbers').insert({ ...payload, updated_at: new Date().toISOString() }).select('id,created_at').single()
+      const { data, error } = await admin.from('big_numbers').insert(payload).select('id').single()
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ success: true, data })
     }

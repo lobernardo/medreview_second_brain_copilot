@@ -371,19 +371,22 @@ export default function ObjEcoesPage() {
                   className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors select-none"
                   onClick={() => toggleExpand(obj.id)}
                 >
-                  <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
-                    <span className="text-sm font-semibold text-gray-900 truncate">
-                      &ldquo;{obj.topic}&rdquo;
+                  <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                    <span className="text-sm font-semibold text-gray-900 line-clamp-1">
+                      &ldquo;{obj.definition || obj.topic}&rdquo;
                     </span>
-                    {obj.vertical && <VerticalBadge vertical={obj.vertical} />}
-                    {wr && (
-                      <span
-                        className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold"
-                        style={{ color: wr.color, background: wr.bg }}
-                      >
-                        win {wr.label}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] text-gray-400">{obj.topic}</span>
+                      {obj.vertical && <VerticalBadge vertical={obj.vertical} />}
+                      {wr && (
+                        <span
+                          className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold"
+                          style={{ color: wr.color, background: wr.bg }}
+                        >
+                          win {wr.label}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                     {/* Gestor quick-edit button (stops propagation) */}
@@ -542,6 +545,17 @@ export default function ObjEcoesPage() {
               )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5 col-span-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Objeção</label>
+                  <input
+                    type="text"
+                    value={form.definition}
+                    onChange={e => setForm(p => ({ ...p, definition: e.target.value }))}
+                    placeholder="A frase exata que o lead diz. Ex: 'Pra ser sincero, eu achei o valor um pouco acima do que eu esperava'"
+                    className="w-full px-3 py-2 border rounded-lg text-sm text-gray-800 focus:ring-2 focus:ring-indigo-200 outline-none"
+                    style={{ borderColor: '#E5E7EB' }}
+                  />
+                </div>
+                <div className="space-y-1.5 col-span-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Tema *</label>
                   <input
                     type="text"
@@ -573,17 +587,6 @@ export default function ObjEcoesPage() {
                     value={form.win_rate}
                     onChange={e => setForm(p => ({ ...p, win_rate: e.target.value }))}
                     placeholder="Ex: 65"
-                    className="w-full px-3 py-2 border rounded-lg text-sm text-gray-800 focus:ring-2 focus:ring-indigo-200 outline-none"
-                    style={{ borderColor: '#E5E7EB' }}
-                  />
-                </div>
-                <div className="space-y-1.5 col-span-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Definição</label>
-                  <input
-                    type="text"
-                    value={form.definition}
-                    onChange={e => setForm(p => ({ ...p, definition: e.target.value }))}
-                    placeholder="Breve definição da objeção…"
                     className="w-full px-3 py-2 border rounded-lg text-sm text-gray-800 focus:ring-2 focus:ring-indigo-200 outline-none"
                     style={{ borderColor: '#E5E7EB' }}
                   />

@@ -256,6 +256,9 @@ export default function VerdadeiroValorPage() {
                 placeholder="Escreva o verdadeiro valor da Med-Review em Markdown..."
                 className="w-full border border-[#E5E7EB] rounded-lg px-3 py-2.5 text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-mono"
               />
+              <p className="text-[11px] text-gray-400">
+                Use Markdown para formatar: <code className="bg-gray-100 px-1 rounded">**negrito**</code> · <code className="bg-gray-100 px-1 rounded">- bullets</code> · <code className="bg-gray-100 px-1 rounded">## títulos</code>
+              </p>
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleSaveVv}
