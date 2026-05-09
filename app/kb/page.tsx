@@ -239,13 +239,23 @@ export default function KbPage() {
       }
       let savedId: string
       if (editingDoc) {
-        await supabase.from('knowledge_base').update(payload).eq('id', editingDoc.id)
+        const res = await fetch('/api/kb', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingDoc.id, ...payload }),
+        })
+        if (!res.ok) throw new Error((await res.json()).error)
         savedId = editingDoc.id
         setDocs(prev => prev.map(d => d.id === editingDoc.id ? { ...d, ...payload } : d))
       } else {
-        const { data, error } = await supabase.from('knowledge_base').insert(payload).select('id').single()
-        if (error) throw error
-        savedId = data.id
+        const res = await fetch('/api/kb', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error)
+        savedId = json.data.id
         setDocs(prev => [{ ...payload, id: savedId } as KbDoc, ...prev])
       }
       fetch('/api/embeddings', {
@@ -264,7 +274,12 @@ export default function KbPage() {
 
   async function handleDelete(id: string) {
     try {
-      await supabase.from('knowledge_base').update({ is_active: false }).eq('id', id)
+      const res = await fetch('/api/kb', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) throw new Error()
       setDocs(prev => prev.filter(d => d.id !== id))
       setToast({ type: 'success', message: 'Documento removido.' })
     } catch {

@@ -7,6 +7,7 @@ import { VerticalBadge } from '@/components/ui/badge'
 import type { Profile } from '@/lib/utils/types'
 import { SkeletonGrid } from '@/components/ui/skeleton'
 import { Toast } from '@/components/ui/toast'
+import { useProfile } from '@/lib/context/profile-context'
 
 const COPY_CATEGORIES = [
   { value: 'abertura', label: 'Abertura' },
@@ -87,8 +88,8 @@ export default function CopysPage() {
     []
   )
 
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [role, setRole] = useState<string | null>(null)
+  const profile = useProfile()
+  const role = profile?.role ?? null
   const [activeTab, setActiveTab] = useState<'minhas' | 'time' | 'buscar'>('minhas')
   const [myCopys, setMyCopys] = useState<CopyItem[]>([])
   const [teamCopys, setTeamCopys] = useState<CopyItem[]>([])
@@ -106,29 +107,25 @@ export default function CopysPage() {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
-    async function load() {
-      try {
-        const { data } = await supabase.auth.getUser()
-        if (data.user) {
-          const { data: p } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
-          if (p) { setProfile(p as Profile); setRole(p.role) }
-        }
-      } catch {}
-    }
-    load()
-  }, [supabase])
-
-  useEffect(() => {
-    if (!profile) return
     async function loadMy() {
+      if (!profile) {
+        setLoading(false)
+        return
+      }
       setLoading(true)
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('user_copys').select('*')
-          .eq('user_id', profile!.id).eq('is_active', true)
+          .eq('user_id', profile.id).eq('is_active', true)
           .order('updated_at', { ascending: false })
+        if (error) console.error('[copys] loadMy error:', error)
         setMyCopys((data ?? []) as CopyItem[])
-      } catch { setMyCopys([]) } finally { setLoading(false) }
+      } catch (e) {
+        console.error('[copys] loadMy catch:', e)
+        setMyCopys([])
+      } finally {
+        setLoading(false)
+      }
     }
     loadMy()
   }, [supabase, profile])
@@ -136,12 +133,16 @@ export default function CopysPage() {
   useEffect(() => {
     async function loadTeam() {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('user_copys').select('*')
           .eq('is_shared', true).eq('is_active', true)
           .order('user_name', { ascending: true })
+        if (error) console.error('[copys] loadTeam error:', error)
         setTeamCopys((data ?? []) as CopyItem[])
-      } catch { setTeamCopys([]) }
+      } catch (e) {
+        console.error('[copys] loadTeam catch:', e)
+        setTeamCopys([])
+      }
     }
     loadTeam()
   }, [supabase])
@@ -193,16 +194,26 @@ export default function CopysPage() {
       }
       let savedId: string
       if (editingCopy) {
-        await supabase.from('user_copys').update(payload).eq('id', editingCopy.id)
+        const res = await fetch('/api/copys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingCopy.id, ...payload }),
+        })
+        if (!res.ok) throw new Error((await res.json()).error)
         savedId = editingCopy.id
         const updated = { ...editingCopy, ...payload }
         setMyCopys(prev => prev.map(c => c.id === editingCopy.id ? updated : c))
         setTeamCopys(prev => prev.map(c => c.id === editingCopy.id ? updated : c))
       } else {
         const full = { ...payload, user_id: profile.id, user_name: profile.name, times_used: 0 }
-        const { data, error } = await supabase.from('user_copys').insert(full).select('id').single()
-        if (error) throw error
-        savedId = data.id
+        const res = await fetch('/api/copys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(full),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error)
+        savedId = json.data.id
         const newItem: CopyItem = { ...full, id: savedId }
         setMyCopys(prev => [newItem, ...prev])
         if (full.is_shared) setTeamCopys(prev => [newItem, ...prev])
@@ -219,7 +230,12 @@ export default function CopysPage() {
 
   async function handleDelete(id: string) {
     try {
-      await supabase.from('user_copys').update({ is_active: false }).eq('id', id)
+      const res = await fetch('/api/copys', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) throw new Error()
       setMyCopys(prev => prev.filter(c => c.id !== id))
       setTeamCopys(prev => prev.filter(c => c.id !== id))
       setToast({ type: 'success', message: 'Copy removida.' })

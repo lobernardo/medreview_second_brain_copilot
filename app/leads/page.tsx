@@ -111,13 +111,22 @@ export default function LeadsPage() {
         updated_at: new Date().toISOString(),
       }
       if (editingLead) {
-        await supabase.from('meus_leads').update(payload).eq('id', editingLead.id)
+        const res = await fetch('/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingLead.id, ...payload }),
+        })
+        if (!res.ok) throw new Error((await res.json()).error)
         setLeads(prev => prev.map(l => l.id === editingLead.id ? { ...editingLead, ...payload } : l))
       } else {
-        const full = { ...payload, user_id: userId }
-        const { data, error } = await supabase.from('meus_leads').insert(full).select('*').single()
-        if (error) throw error
-        setLeads(prev => [data as Lead, ...prev])
+        const res = await fetch('/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error)
+        setLeads(prev => [json.data as Lead, ...prev])
       }
       closeModal()
       setToast({ type: 'success', message: editingLead ? 'Lead atualizado.' : 'Lead adicionado.' })
@@ -126,7 +135,12 @@ export default function LeadsPage() {
 
   async function handleDelete(id: string) {
     try {
-      await supabase.from('meus_leads').delete().eq('id', id)
+      const res = await fetch('/api/leads', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) throw new Error()
       setLeads(prev => prev.filter(l => l.id !== id))
       setToast({ type: 'success', message: 'Lead removido.' })
     } catch {

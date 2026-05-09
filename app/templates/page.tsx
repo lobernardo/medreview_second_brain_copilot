@@ -189,16 +189,22 @@ export default function TemplatesPage() {
     setTogglingFavId(tplId)
     try {
       if (favorites[tplId]) {
-        await supabase.from('user_favorite_templates').delete().eq('id', favorites[tplId].id)
+        const res = await fetch('/api/favorites', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: favorites[tplId].id }),
+        })
+        if (!res.ok) throw new Error()
         setFavorites(prev => { const n = { ...prev }; delete n[tplId]; return n })
       } else {
-        const { data, error } = await supabase
-          .from('user_favorite_templates')
-          .insert({ user_id: userId, template_id: tplId })
-          .select('id,user_id,template_id')
-          .single()
-        if (error) throw error
-        setFavorites(prev => ({ ...prev, [tplId]: data as FavoriteRow }))
+        const res = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ template_id: tplId }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error)
+        setFavorites(prev => ({ ...prev, [tplId]: json.data as FavoriteRow }))
       }
     } catch {
       setToast({ type: 'error', message: 'Erro ao atualizar favorito.' })
@@ -260,19 +266,25 @@ export default function TemplatesPage() {
       }
       let savedId: string
       if (editingTpl) {
-        await supabase.from('whatsapp_templates').update(payload).eq('id', editingTpl.id)
+        const res = await fetch('/api/templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingTpl.id, ...payload }),
+        })
+        if (!res.ok) throw new Error((await res.json()).error)
         savedId = editingTpl.id
         const updated: WaTemplate = { ...editingTpl, ...payload }
         setTemplates(prev => prev.map(t => t.id === editingTpl.id ? updated : t))
       } else {
-        const { data, error } = await supabase
-          .from('whatsapp_templates')
-          .insert(payload)
-          .select('id,created_at')
-          .single()
-        if (error) throw error
-        savedId = data.id
-        const newItem: WaTemplate = { ...payload, id: savedId, created_at: data.created_at }
+        const res = await fetch('/api/templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error)
+        savedId = json.data.id
+        const newItem: WaTemplate = { ...payload, id: savedId, created_at: json.data.created_at }
         setTemplates(prev => [newItem, ...prev])
       }
       // Index embeddings async
@@ -292,7 +304,12 @@ export default function TemplatesPage() {
   // ── Delete
   async function handleDelete(id: string) {
     try {
-      await supabase.from('whatsapp_templates').update({ is_active: false }).eq('id', id)
+      const res = await fetch('/api/templates', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) throw new Error()
       setTemplates(prev => prev.filter(t => t.id !== id))
       setFavorites(prev => { const n = { ...prev }; delete n[id]; return n })
       setToast({ type: 'success', message: 'Template removido.' })

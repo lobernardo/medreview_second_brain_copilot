@@ -112,21 +112,17 @@ export default function VerdadeiroValorPage() {
   async function handleSaveVv() {
     setSavingVv(true)
     try {
+      const res = await fetch('/api/verdadeiro-valor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: vv?.id ?? null, content: vvDraft }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
       if (vv) {
-        const { error } = await supabase
-          .from('verdadeiro_valor')
-          .update({ content: vvDraft, updated_at: new Date().toISOString() })
-          .eq('id', vv.id)
-        if (error) throw error
         setVv({ ...vv, content: vvDraft })
       } else {
-        const { data, error } = await supabase
-          .from('verdadeiro_valor')
-          .insert({ content: vvDraft })
-          .select()
-          .single()
-        if (error) throw error
-        setVv(data)
+        setVv({ id: json.data.id, content: vvDraft, updated_at: new Date().toISOString() })
       }
       setEditingVv(false)
       showToast('Conteúdo salvo com sucesso')
@@ -176,18 +172,24 @@ export default function VerdadeiroValorPage() {
         is_highlight: form.is_highlight,
       }
       if (editingBn) {
-        const { error } = await supabase.from('big_numbers').update(payload).eq('id', editingBn.id)
-        if (error) throw error
+        const res = await fetch('/api/big-numbers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingBn.id, ...payload }),
+        })
+        if (!res.ok) throw new Error((await res.json()).error)
         setBns(prev => prev.map(b => b.id === editingBn.id ? { ...b, ...payload } : b))
         showToast('Número atualizado')
       } else {
-        const { data, error } = await supabase
-          .from('big_numbers')
-          .insert({ ...payload, is_active: true })
-          .select()
-          .single()
-        if (error) throw error
-        setBns(prev => [...prev, data].sort((a, b) => a.label.localeCompare(b.label)))
+        const res = await fetch('/api/big-numbers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, is_active: true }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error)
+        const newBn: BigNumber = { ...payload, id: json.data.id, is_active: true }
+        setBns(prev => [...prev, newBn].sort((a, b) => a.label.localeCompare(b.label)))
         showToast('Número adicionado')
       }
       closeModal()
@@ -199,8 +201,12 @@ export default function VerdadeiroValorPage() {
   }
 
   async function handleDeleteBn(id: string) {
-    const { error } = await supabase.from('big_numbers').update({ is_active: false }).eq('id', id)
-    if (error) { showToast('Erro ao excluir', 'error'); return }
+    const res = await fetch('/api/big-numbers', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    if (!res.ok) { showToast('Erro ao excluir', 'error'); return }
     setBns(prev => prev.filter(b => b.id !== id))
     setConfirmDeleteId(null)
     showToast('Número removido')
@@ -520,7 +526,7 @@ export default function VerdadeiroValorPage() {
         </div>
       )}
 
-      {toast && <Toast message={toast.message} type={toast.type} />}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   )
 }

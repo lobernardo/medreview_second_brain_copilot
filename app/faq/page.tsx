@@ -114,14 +114,24 @@ export default function FaqPage() {
       }
       let savedId: string
       if (editingFaq) {
-        await supabase.from('faq_items').update(payload).eq('id', editingFaq.id)
+        const res = await fetch('/api/faq', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingFaq.id, ...payload }),
+        })
+        if (!res.ok) throw new Error((await res.json()).error)
         savedId = editingFaq.id
         setFaqs(prev => prev.map(f => f.id === editingFaq.id ? { ...f, ...payload } : f))
       } else {
         const full = { ...payload, created_by: profile?.id ?? null, created_by_name: profile?.name ?? null, status: 'rascunho' as const, validated_by: null }
-        const { data, error } = await supabase.from('faq_items').insert(full).select('id').single()
-        if (error) throw error
-        savedId = data.id
+        const res = await fetch('/api/faq', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(full),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error)
+        savedId = json.data.id
         setFaqs(prev => [{ ...full, id: savedId, created_at: new Date().toISOString() } as FaqItem, ...prev])
       }
       fetch('/api/embeddings', {
@@ -137,7 +147,12 @@ export default function FaqPage() {
   async function handleValidate(faq: FaqItem) {
     const newStatus = faq.status === 'validado' ? 'rascunho' : 'validado'
     try {
-      await supabase.from('faq_items').update({ status: newStatus, validated_by: newStatus === 'validado' ? profile?.id ?? null : null }).eq('id', faq.id)
+      const res = await fetch('/api/faq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: faq.id, status: newStatus, validated_by: newStatus === 'validado' ? profile?.id ?? null : null }),
+      })
+      if (!res.ok) throw new Error()
       setFaqs(prev => prev.map(f => f.id === faq.id ? { ...f, status: newStatus } : f))
       setToast({ type: 'success', message: newStatus === 'validado' ? 'FAQ validada.' : 'Marcada como rascunho.' })
     } catch {
@@ -147,7 +162,12 @@ export default function FaqPage() {
 
   async function handleDelete(id: string) {
     try {
-      await supabase.from('faq_items').update({ is_active: false }).eq('id', id)
+      const res = await fetch('/api/faq', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) throw new Error()
       setFaqs(prev => prev.filter(f => f.id !== id))
       setToast({ type: 'success', message: 'FAQ removida.' })
     } catch {

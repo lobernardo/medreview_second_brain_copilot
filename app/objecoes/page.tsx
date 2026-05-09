@@ -165,16 +165,14 @@ export default function ObjEcoesPage() {
     if (!text || !userId) return
     setSavingResp(prev => ({ ...prev, [objId]: true }))
     try {
-      const { data, error } = await supabase
-        .from('user_objection_responses')
-        .upsert(
-          { user_id: userId, objection_id: objId, response_text: text, updated_at: new Date().toISOString() },
-          { onConflict: 'user_id,objection_id' },
-        )
-        .select('id,user_id,objection_id,response_text')
-        .single()
-      if (error) throw error
-      setPersonalResponses(prev => ({ ...prev, [objId]: data as UserObjResponse }))
+      const res = await fetch('/api/user-objection-responses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ objection_id: objId, response_text: text }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      setPersonalResponses(prev => ({ ...prev, [objId]: json.data as UserObjResponse }))
       setToast({ type: 'success', message: 'Resposta salva!' })
     } catch { setToast({ type: 'error', message: 'Erro ao salvar.' }) }
     finally { setSavingResp(prev => ({ ...prev, [objId]: false })) }
@@ -185,7 +183,12 @@ export default function ObjEcoesPage() {
     const resp = personalResponses[objId]
     if (!resp) return
     try {
-      await supabase.from('user_objection_responses').delete().eq('id', resp.id)
+      const res = await fetch('/api/user-objection-responses', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: resp.id }),
+      })
+      if (!res.ok) throw new Error()
       setPersonalResponses(prev => { const n = { ...prev }; delete n[objId]; return n })
       setResponseTexts(prev => ({ ...prev, [objId]: '' }))
       setToast({ type: 'success', message: 'Resposta removida.' })
@@ -222,17 +225,23 @@ export default function ObjEcoesPage() {
       }
       let savedId: string
       if (editingObj) {
-        await supabase.from('objection_patterns').update(payload).eq('id', editingObj.id)
+        const res = await fetch('/api/objecoes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingObj.id, ...payload }),
+        })
+        if (!res.ok) throw new Error((await res.json()).error)
         savedId = editingObj.id
         setObjs(prev => prev.map(o => o.id === editingObj.id ? { ...o, ...payload } : o))
       } else {
-        const { data, error } = await supabase
-          .from('objection_patterns')
-          .insert({ ...payload, times_seen_total: 0 })
-          .select('id')
-          .single()
-        if (error) throw error
-        savedId = data.id
+        const res = await fetch('/api/objecoes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, times_seen_total: 0 }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error)
+        savedId = json.data.id
         setObjs(prev => [{ ...payload, id: savedId, times_seen_total: 0 } as ObjPattern, ...prev])
       }
       fetch('/api/embeddings', {
@@ -250,7 +259,12 @@ export default function ObjEcoesPage() {
 
   async function handleDelete(id: string) {
     try {
-      await supabase.from('objection_patterns').delete().eq('id', id)
+      const res = await fetch('/api/objecoes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) throw new Error()
       setObjs(prev => prev.filter(o => o.id !== id))
       setToast({ type: 'success', message: 'Objeção removida.' })
     } catch {
