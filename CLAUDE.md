@@ -1,7 +1,7 @@
 # CLAUDE.md — Second Brain Med-Review
 
 > **Fonte de verdade do projeto. Leia antes de qualquer tarefa.**
-> **Versão:** 4.0 | Data: 07/05/2026
+> **Versão:** 5.0 | Data: 09/05/2026
 
 ---
 
@@ -16,7 +16,7 @@ Dois copilots de IA alimentados por RAG (busca vetorial sobre a base de conhecim
 | **Copilot Vendas** | closers + gestores | Objeções, propostas, diagnóstico, follow-up, copys |
 | **Copilot Onboarding** | novos colaboradores + gestores | Aprender produtos, processos, regras do time |
 
-Além dos copilots, o sistema oferece ferramentas complementares: bloco de leads (No Radar), copys & macros, templates WhatsApp, FAQ, matriz de objeções e knowledge base.
+Além dos copilots, o sistema oferece: Verdadeiro Valor, No Radar (leads), Copys & Macros, Templates WhatsApp, FAQ, Matriz de Objeções e Knowledge Base.
 
 ---
 
@@ -27,7 +27,7 @@ Além dos copilots, o sistema oferece ferramentas complementares: bloco de leads
 | Framework | Next.js (App Router, TypeScript) | 16.2.4 |
 | Runtime UI | React | 19.2.4 |
 | Estilos | Tailwind CSS | 4 |
-| Componentes | shadcn/ui (selecionado) + Lucide React | lucide 1.14.0 |
+| Componentes | shadcn/ui (escrito manualmente) + Lucide React | lucide 1.14.0 |
 | Font | Inter (@fontsource/inter) | 5.2.8 |
 | Auth | Supabase Auth via `@supabase/ssr` | ssr 0.10.2 |
 | Database | Supabase (PostgreSQL + pgvector) | supabase-js 2.105.3 |
@@ -39,6 +39,7 @@ Além dos copilots, o sistema oferece ferramentas complementares: bloco de leads
 | Deploy | Vercel | — |
 
 > **Não há shadcn CLI configurado** — componentes UI foram escritos manualmente seguindo o padrão shadcn.
+> **Sem middleware.ts** — proteção de rotas feita no layout raiz via `app/layout.tsx`.
 
 ---
 
@@ -61,8 +62,10 @@ OPENAI_API_KEY=sk-...
 ```
 Usuário envia mensagem + mode
         ↓
+[SEMPRE] Busca Verdadeiro Valor + Big Numbers (admin client, sem RAG)
+        ↓
 Embedding da mensagem (OpenAI text-embedding-3-small)
-        ↓                          ↓ (se OPENAI_API_KEY ausente)
+        ↓                          ↓ (se OPENAI_API_KEY ausente ou erro)
 Buscas vetoriais paralelas      Fallback: search_knowledge_base_text (ILIKE)
   ├─ match_knowledge_base     (5 docs, threshold 0.50)  — sempre
   ├─ match_faq                (3 docs, threshold 0.50)  — sempre
@@ -83,42 +86,49 @@ SSE streaming → renderiza token a token no cliente
 Context Inspector mostra sources (título + similarity)
 ```
 
-### Chamada Groq (groq-client.ts)
+### Chamada Groq (`lib/ai/groq-client.ts`)
 
 ```typescript
-// lib/ai/groq-client.ts
+// callGroqStream({ systemPrompt, messages }) → ReadableStream
 fetch('https://api.groq.com/openai/v1/chat/completions', {
-  method: 'POST',
-  headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    model: 'llama-3.3-70b-versatile',
-    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: message }],
-    temperature: 0.3,
-    max_tokens: 4096,
-    stream: true,
-  }),
+  model: 'llama-3.3-70b-versatile',
+  temperature: 0.3,
+  max_tokens: 4096,
+  stream: true,
 })
 ```
 
-### Chamada Embeddings (embeddings.ts)
+### Chamada Embeddings (`lib/ai/embeddings.ts`)
 
 ```typescript
-// lib/ai/embeddings.ts
+// generateEmbedding(text) → number[1536]
 fetch('https://api.openai.com/v1/embeddings', {
-  method: 'POST',
-  headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ model: 'text-embedding-3-small', input: text }),
+  model: 'text-embedding-3-small',
+  input: text,
 })
-// → data.data[0].embedding (número[1536])
 ```
 
-### Chamada Whisper (api/transcribe/route.ts)
+### Chamada Whisper (`app/api/transcribe/route.ts`)
 
-```typescript
-// Formato: multipart/form-data para api.openai.com/v1/audio/transcriptions
-// model: whisper-1, language: pt, response_format: text
-// Limite: 25 MB | Formatos: mp3, m4a, wav, webm, mpga, mp4, mpeg
 ```
+multipart/form-data → api.openai.com/v1/audio/transcriptions
+model: whisper-1 | language: pt | response_format: text
+Limite: 25 MB | Formatos: mp3, m4a, wav, webm, mpga, mp4, mpeg
+```
+
+### Verdadeiro Valor no Contexto (`lib/ai/context-builder.ts`)
+
+`fetchVerdadeiroValor()` é chamado em **toda** consulta (qualquer mode, vendas e onboarding):
+- Busca `verdadeiro_valor` (singleton, registro mais recente)
+- Busca todos os `big_numbers`
+- Formata como bloco fixo no topo do contexto:
+  ```
+  VERDADEIRO VALOR DA MED-REVIEW:
+  {texto}
+
+  BIG NUMBERS:
+  • {value} — {label}: {description} ({vertical}) [{category}]
+  ```
 
 ---
 
@@ -129,7 +139,7 @@ copilot-medreview/
 ├── app/
 │   ├── layout.tsx                      # Root layout com AppShell + auth check
 │   ├── page.tsx                        # Redirect → /copilot-vendas
-│   ├── globals.css                     # Design tokens CSS + Tailwind import
+│   ├── globals.css                     # Design tokens CSS + cursor-pointer global + Tailwind
 │   ├── login/page.tsx                  # Auth: login / criar conta / reset senha
 │   ├── copilot-vendas/page.tsx         # Chat — Copilot de Vendas (8 modos)
 │   ├── copilot-onboarding/page.tsx     # Chat — Copilot de Onboarding (trilha)
@@ -140,13 +150,24 @@ copilot-medreview/
 │   ├── faq/page.tsx                    # FAQ (Comercial + Clientes)
 │   ├── objecoes/page.tsx               # Matriz de objeções com respostas pessoais
 │   ├── kb/page.tsx                     # Knowledge Base (texto / import / transcrição)
+│   ├── verdadeiro-valor/page.tsx       # Verdadeiro Valor + Big Numbers
 │   ├── settings/page.tsx               # Perfil + wizard de estilo do copilot
 │   └── api/
 │       ├── copilot-vendas/route.ts     # POST — streaming chat vendas (RAG + Groq)
 │       ├── copilot-onboarding/route.ts # POST — streaming chat onboarding
 │       ├── profile/route.ts            # PATCH — atualizar perfil do usuário
 │       ├── embeddings/route.ts         # POST — gera embedding e salva na tabela
-│       └── transcribe/route.ts         # POST — transcreve áudio/vídeo via Whisper
+│       ├── transcribe/route.ts         # POST — transcreve áudio/vídeo via Whisper
+│       ├── copys/route.ts              # GET, POST, DELETE — user_copys
+│       ├── faq/route.ts                # GET, POST, DELETE — faq_items
+│       ├── objecoes/route.ts           # GET, POST, DELETE — objection_patterns + user_objection_responses
+│       ├── kb/route.ts                 # GET, POST, DELETE — knowledge_base
+│       ├── templates/route.ts          # GET, POST, DELETE — whatsapp_templates
+│       ├── leads/route.ts              # GET, POST, DELETE — meus_leads
+│       ├── big-numbers/route.ts        # GET, POST, DELETE — big_numbers
+│       ├── verdadeiro-valor/route.ts   # GET, POST — verdadeiro_valor (singleton)
+│       ├── favorites/route.ts          # POST, DELETE — user_favorite_templates
+│       └── user-objection-responses/route.ts  # POST, DELETE — user_objection_responses
 │
 ├── components/
 │   ├── layout/
@@ -156,7 +177,7 @@ copilot-medreview/
 │   │   ├── mobile-nav.tsx              # Bottom nav + drawer para mobile
 │   │   └── stub-page.tsx               # Placeholder para páginas em construção
 │   ├── ui/
-│   │   ├── toast.tsx                   # Notificação flutuante (success/error)
+│   │   ├── toast.tsx                   # Notificação flutuante (success/error), requer onClose
 │   │   ├── badge.tsx                   # VerticalBadge (R1, Anest, Oft, Ortop)
 │   │   └── skeleton.tsx                # SkeletonCard / SkeletonGrid / SkeletonList / SkeletonForm
 │   └── chat/
@@ -170,16 +191,15 @@ copilot-medreview/
 │   │   ├── vendas-prompt.ts           # buildVendasSystemPrompt(mode, context)
 │   │   └── onboarding-prompt.ts       # buildOnboardingSystemPrompt() + getWelcomeMessage()
 │   ├── supabase/
-│   │   ├── client.ts                  # createBrowserClient (anon key)
-│   │   ├── server.ts                  # createServerClient (cookies SSR)
-│   │   └── admin.ts                   # createClient com service_role (bypass RLS)
+│   │   ├── client.ts                  # createBrowserClient (anon key) — apenas leitura leve / auth
+│   │   ├── server.ts                  # createServerClient (cookies SSR) — verificar auth nas API routes
+│   │   └── admin.ts                   # createAdminClient com service_role (bypass RLS)
 │   ├── utils/
 │   │   ├── types.ts                   # interface Profile
 │   │   └── constants.ts               # VERTICAL_CONFIG, VERTICALS
 │   └── context/
 │       └── profile-context.tsx        # ProfileProvider + useProfile() hook
 │
-├── middleware.ts                       # Supabase SSR middleware (refresh session)
 ├── next.config.js
 ├── tailwind.config.js
 ├── tsconfig.json
@@ -188,31 +208,67 @@ copilot-medreview/
 
 ---
 
-## 6. SIDEBAR — ITENS E VISIBILIDADE POR ROLE
+## 6. PADRÃO DE API ROUTES — REGRA CRÍTICA
+
+**TODAS as operações de escrita E leitura usam `createAdminClient()` (service_role_key)**, não o cliente anon. Isso bypassa o RLS do Supabase, que estava bloqueando reads/writes via anon key.
+
+Padrão de cada route:
+
+```typescript
+export async function GET/POST/DELETE(request: Request) {
+  // 1. Verifica auth via server client (cookies)
+  const supabase = await createClient()          // lib/supabase/server.ts
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // 2. Opera no DB com admin client (bypassa RLS)
+  const admin = createAdminClient()              // lib/supabase/admin.ts
+  const { data, error } = await admin.from('tabela')...
+
+  // 3. Retorna { success, data } ou { error }
+}
+```
+
+**Páginas client-side:** usam `fetch('/api/...')` para TODAS as operações (GET e POST/DELETE). **Nunca** `supabase.from().select/insert/update/delete()` direto nas páginas — o RLS bloqueia.
+
+---
+
+## 7. SIDEBAR — ITENS E VISIBILIDADE POR ROLE
 
 ```
-Item                  | Rota                | Ícone           | closer | gestor | onboarding
-----------------------|---------------------|-----------------|--------|--------|----------
-Copilot Vendas        | /copilot-vendas     | Bot             |  ✅    |  ✅    |
-Copilot Onboarding    | /copilot-onboarding | GraduationCap   |        |  ✅    |  ✅
-No Radar              | /leads              | NotebookPen     |  ✅    |  ✅    |
-Copys                 | /copys              | Mail            |  ✅    |  ✅    |
+Item                  | Rota                | Ícone            | closer | gestor | onboarding
+----------------------|---------------------|------------------|--------|--------|----------
+Copilot Vendas        | /copilot-vendas     | Bot              |  ✅    |  ✅    |
+Copilot Onboarding    | /copilot-onboarding | GraduationCap    |        |  ✅    |  ✅
+Verdadeiro Valor      | /verdadeiro-valor   | Trophy           |  ✅    |  ✅    |  ✅
+No Radar              | /leads              | NotebookPen      |  ✅    |  ✅    |
+Copys                 | /copys              | Mail             |  ✅    |  ✅    |
 Templates             | /templates          | MessageSquareText|  ✅    |  ✅    |
-FAQ                   | /faq                | HelpCircle      |  ✅    |  ✅    |  ✅
-Matriz de Objeções    | /objecoes           | Shield          |  ✅    |  ✅    |
-Knowledge Base        | /kb                 | BookOpen        |  ✅    |  ✅    |  ✅
-Config Onboarding     | /onboarding-config  | Settings2       |        |  ✅    |
-Configurações         | /settings           | Settings        |  ✅    |  ✅    |  ✅
+FAQ                   | /faq                | HelpCircle       |  ✅    |  ✅    |  ✅
+Matriz de Objeções    | /objecoes           | Shield           |  ✅    |  ✅    |
+Knowledge Base        | /kb                 | BookOpen         |  ✅    |  ✅    |  ✅
+Config Onboarding     | /onboarding-config  | Settings2        |        |  ✅    |
+Configurações         | /settings           | Settings         |  ✅    |  ✅    |  ✅
 ```
 
 **Sidebar visual:** gradiente `#1E1B4B → #2D2A7A`, 240px desktop, texto `#C7D2FE`, active `bg-[#4338CA]`.
 **Footer:** avatar com inicial do nome + role em `#C7D2FE`.
 
+### Mobile Nav
+
+Bottom bar (4 ítens + botão Menu que abre drawer):
+
+| Role | Bottom bar | Drawer |
+|------|-----------|--------|
+| closer | vendas, copys, leads, faq | valor, templates, objecoes, kb, settings |
+| gestor | vendas, onboarding, copys, leads | valor, templates, faq, objecoes, kb, config, settings |
+| onboarding | onboarding, faq, kb, settings | valor |
+
 ---
 
-## 7. BANCO DE DADOS
+## 8. BANCO DE DADOS
 
-### 7.1 Tabelas (11 ativas)
+### 8.1 Tabelas (12 ativas)
 
 ```sql
 -- 1. profiles
@@ -224,7 +280,7 @@ create table profiles (
   phone text,
   whatsapp_link text,
   default_greeting text,
-  style_notes text,           -- tom de voz do closer (alimenta copilot)
+  style_notes text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -253,7 +309,7 @@ create table knowledge_base (
 create table objection_patterns (
   id uuid default gen_random_uuid() primary key,
   topic text not null,
-  definition text,
+  definition text,        -- a frase exata que o lead diz
   real_meaning text,
   vertical text,
   recommended_response text,
@@ -297,7 +353,7 @@ create table user_copys (
   )) not null,
   vertical text check (vertical in ('R1', 'Anest', 'Oft', 'Ortop', 'Geral')),
   title text not null,
-  message_text text not null,          -- suporta {{variáveis}}
+  message_text text not null,
   variables text[],
   when_to_use text,
   when_not_to_use text,
@@ -341,7 +397,7 @@ create table conversations (
 -- 8. onboarding_config
 create table onboarding_config (
   id uuid default gen_random_uuid() primary key,
-  trail jsonb not null default '[]',   -- TrailItem[]: {order, title, description}
+  trail jsonb not null default '[]',
   custom_instructions text,
   welcome_message text,
   tone text default 'didático e acolhedor',
@@ -370,14 +426,15 @@ create table meus_leads (
 create table whatsapp_templates (
   id uuid default gen_random_uuid() primary key,
   name text not null,
-  momento text,                        -- reengajamento, follow-up, etc.
-  copy_text text not null,             -- suporta {{variáveis}}
+  momento text,
+  copy_text text not null,
   variables text[],
   vertical text,
   notes text,
   is_active boolean default true,
   embedding vector(1536),
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 -- 11. user_favorite_templates
@@ -387,7 +444,7 @@ create table user_favorite_templates (
   template_id uuid references whatsapp_templates(id) on delete cascade
 );
 
--- (extra: user_objection_responses — respostas pessoais do closer por objeção)
+-- 12. user_objection_responses
 create table user_objection_responses (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references auth.users(id) on delete cascade,
@@ -395,9 +452,32 @@ create table user_objection_responses (
   response_text text not null,
   updated_at timestamptz default now()
 );
+
+-- 13. verdadeiro_valor (singleton)
+create table verdadeiro_valor (
+  id uuid default gen_random_uuid() primary key,
+  content text not null,
+  updated_at timestamptz default now()
+);
+
+-- 14. big_numbers
+create table big_numbers (
+  id uuid default gen_random_uuid() primary key,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  label text not null,
+  value text not null,         -- ex: "26.000+", "+90%", "5+"
+  description text,
+  category text,               -- aprovação | alunos | satisfação | mercado | outro
+  vertical text,
+  is_highlight boolean default false,
+  sort_order int,
+  created_by uuid
+  -- NÃO tem coluna is_active
+);
 ```
 
-### 7.2 Funções RPC (pgvector HNSW)
+### 8.2 Funções RPC (pgvector HNSW)
 
 ```sql
 match_knowledge_base(query_embedding vector, match_count int, match_threshold float)
@@ -410,17 +490,17 @@ search_knowledge_base_text(search_query text)   -- fallback ILIKE
 
 ---
 
-## 8. MÓDULOS E TELAS
+## 9. MÓDULOS E TELAS
 
-### 8.1 Copilot Vendas (`/copilot-vendas`)
+### 9.1 Copilot Vendas (`/copilot-vendas`)
 
 **Acesso:** closer + gestor
 
-**8 modos** (chips horizontais no topo do chat):
+**8 modos** (chips horizontais):
 
 | Mode | O que faz |
 |------|-----------|
-| `diagnose` | Perguntas estratégicas para mapear dores, urgência e fit (máx 5/resposta) |
+| `diagnose` | Perguntas estratégicas — mapeia dores, urgência e fit (máx 5/resposta) |
 | `objeção` | Valida → ressignifica → prova com dado ou case real |
 | `proposta` | Gera orçamento JSON estruturado renderizado pelo QuoteCard |
 | `produto` | Explica benefícios + provas (aprovações, taxa de sucesso) |
@@ -429,147 +509,170 @@ search_knowledge_base_text(search_query text)   -- fallback ILIKE
 | `copys` | Mensagem pronta para o funil no tom do closer |
 | `livre` | Resposta direta e propositiva (máx 350 palavras) |
 
-**Fluxo interno:**
-1. Closer envia mensagem + mode selecionado
-2. API `POST /api/copilot-vendas` chama `buildContext(message, mode, userId)`:
-   - Gera embedding (OpenAI)
-   - Buscas vetoriais paralelas nas tabelas relevantes para o mode
-   - Fallback textual se sources < 2
-3. Monta `buildVendasSystemPrompt(mode, context)`
-4. Chama Groq com `stream: true` → retorna SSE
-5. Frontend renderiza token a token (react-markdown)
-6. Context Inspector (collapsible) mostra fontes: título + similarity score
-7. Botão copiar + feedback 👍/👎
+**Query params especiais:** `?lead=NOME&vertical=R1&produto=XXX&objecao=YYY` → pré-preenche mensagem (usado pelo botão "Diagnóstico no Copilot" do No Radar).
 
-**Query params especiais:** `?lead=NOME&vertical=R1&produto=XXX&objecao=YYY` → pré-preenche mensagem de diagnóstico (usado pelo link "Diagnóstico no Copilot" do No Radar).
+**QuoteCard** (mode `proposta`): detecta bloco ` ```json ` no conteúdo, renderiza card com 6 seções + botões Win/Loss para salvar em `quote_examples`.
 
-**QuoteCard** (mode `proposta`): detecta bloco ```json no conteúdo, renderiza card com 6 seções (Contexto, Solução, Entregáveis, Investimento, Diferenciais, Próximos Passos) + botões Win/Loss para salvar em `quote_examples`.
-
-### 8.2 Copilot Onboarding (`/copilot-onboarding`)
+### 9.2 Copilot Onboarding (`/copilot-onboarding`)
 
 **Acesso:** onboarding + gestor
 
-**Sem mode selector.** Guia pela trilha configurada pelo gestor.
+Sem mode selector. Guia pela trilha configurada pelo gestor.
 
-**Fluxo:**
-1. Página busca `onboarding_config` (singleton) na carga
-2. Exibe barra de progresso da trilha no topo
-3. Botão "Próximo tema" avança `currentTopicIndex`
-4. API `POST /api/copilot-onboarding` monta `buildOnboardingSystemPrompt(config, context, currentTopicIndex)`
-5. Copilot explica → exemplifica → quiz → sugere próximo tema
+- Barra de progresso da trilha no topo
+- Botão "Próximo tema" avança `currentTopicIndex`
+- `buildOnboardingSystemPrompt(config, context, currentTopicIndex)` monta o prompt
+- `getWelcomeMessage(config)` — usa mensagem customizada ou gera automática
 
-**Welcome message:** `getWelcomeMessage(config)` — usa mensagem customizada do gestor ou gera automática baseada no primeiro tema da trilha.
+### 9.3 Verdadeiro Valor (`/verdadeiro-valor`)
 
-### 8.3 Config Onboarding (`/onboarding-config`)
+**Acesso:** closer + gestor + onboarding
 
-**Acesso:** gestor only
+**Seção 1 — Texto do Verdadeiro Valor:**
+- Card grande com conteúdo Markdown (tabela `verdadeiro_valor`, singleton)
+- Gestor vê botão "Editar" → textarea Markdown inline com hint de formatação
+- Hint: `**negrito** · - bullets · ## títulos`
+- Closers/onboarding: leitura apenas
+- POST server-side sempre verifica se registro existe antes de INSERT/UPDATE
 
-- Adicionar/remover/reordenar temas da trilha (drag handle)
-- Welcome message personalizada
-- Tom do copilot (4 opções configuráveis)
-- Custom instructions (textarea livre para o gestor instruir o copilot)
-- Salva em `onboarding_config` (singleton)
+**Seção 2 — Big Numbers:**
+- Grid 3 colunas desktop / 1 mobile
+- Cada card: valor grande, label, description, badge de categoria e vertical
+- `is_highlight=true` → borda primária
+- Gestor: botão "+ Novo número" com modal de CRUD
+- Filtros por vertical e categoria
+- Tabela `big_numbers` **não tem coluna `is_active`** — DELETE é exclusão real
 
-### 8.4 No Radar — Meus Leads (`/leads`)
+### 9.4 No Radar — Meus Leads (`/leads`)
 
 **Acesso:** closer + gestor
 
-Bloco de notas pessoal de leads. Cada closer vê só os seus (RLS por `user_id`).
+Bloco de notas pessoal. Cada closer vê só os seus (filtrado por `user_id` no server).
 
-**Campos:** nome*, vertical, produto de interesse, objeção principal, telefone, email, notas.
+**Botão "Diagnóstico no Copilot"** → `/copilot-vendas?lead=...&vertical=...&produto=...&objecao=...`
 
-**Botão "Diagnóstico no Copilot"** → abre `/copilot-vendas` com query params do lead pré-carregados.
-
-### 8.5 Copys & Macros (`/copys`)
+### 9.5 Copys & Macros (`/copys`)
 
 **Acesso:** closer + gestor (onboarding: sem acesso)
 
 **3 tabs:** Minhas | Time | Buscar
 
-- Closer cria/edita/deleta as próprias copys
-- Gestor pode editar qualquer copy
-- Compartilhamento on/off (`is_shared`)
-- Categorias (11): abertura, diagnóstico, apresentação, negociação, fechamento, pós-venda, follow-up-aberto, follow-up-template, comparativo, orçamento, outro
-- Variáveis substituídas automaticamente: `{{nome}}`, `{{vertical}}`, `{{telefone}}`, `{{whatsapp}}`, `{{saudacao}}`, `{{data}}`
+- GET `/api/copys` retorna `{ mine, team }` — ambas as listas em um request
+- Variáveis substituídas: `{{nome}}`, `{{vertical}}`, `{{telefone}}`, `{{whatsapp}}`, `{{saudacao}}`, `{{data}}`
 - Preview com simulação de bolha WhatsApp
-- Ao salvar → chama `POST /api/embeddings` → embedding para RAG
+- Ao salvar → `POST /api/embeddings` (async, sem await)
 
-### 8.6 Templates WhatsApp (`/templates`)
+### 9.6 Templates WhatsApp (`/templates`)
 
 **Acesso:** closer + gestor
 
-- Templates WhatsApp com momentos: reengajamento, follow-up, negociação, encerramento, pós-evento, campanha, teste, recuperação, nutrição, outro
-- Variáveis customizáveis (chips)
-- Favoritos por usuário (`user_favorite_templates`)
+- Momentos: reengajamento, follow-up, negociação, encerramento, pós-evento, campanha, teste, recuperação, nutrição, outro
+- Favoritos por usuário via `user_favorite_templates`
+- GET `/api/templates` retorna `{ templates, favorites }` — um request
 - Gestor cria/edita/deleta; closer usa e favorita
 
-### 8.7 FAQ (`/faq`)
+### 9.7 FAQ (`/faq`)
 
 **Acesso:** closer + gestor + onboarding
 
 **2 tabs:** Comercial (interno) | Clientes
 
-- Closer/onboarding cria em rascunho
-- Gestor valida → muda status para `validado`
+- Closer/onboarding cria em rascunho; gestor valida → `validado`
 - Copilot usa apenas FAQs validadas no RAG
-- Filtros: vertical, categoria, status
 - Ao validar → `POST /api/embeddings`
 
-### 8.8 Matriz de Objeções (`/objecoes`)
+### 9.8 Matriz de Objeções (`/objecoes`)
 
 **Acesso:** closer + gestor
 
 - Accordion list por objeção
-- Campos: tema, definição, significado real, resposta recomendada, o que NÃO dizer, proof points, win rate (%)
-- "Minha resposta" — cada closer salva sua resposta pessoal em `user_objection_responses`
-- Filtro por vertical e busca por texto
-- Gestor edita; ao salvar → `POST /api/embeddings`
+- **Elemento principal do accordion:** `definition` (frase exata do lead) — com `topic` como subtexto
+- Campos no modal (ordem): Objeção (definition) → Tema → Vertical/Win rate → O que o lead quer dizer → Resposta recomendada → O que NÃO dizer → Proof points
+- "Minha resposta" — cada closer salva em `user_objection_responses`
+- GET `/api/objecoes` retorna `{ patterns, responses }` — um request
 
-### 8.9 Knowledge Base (`/kb`)
+### 9.9 Knowledge Base (`/kb`)
 
 **Acesso:** closer + gestor + onboarding (gestor edita, outros leem)
 
 **3 formas de entrada:**
 1. **Escrever** — editor Markdown com preview
-2. **Importar arquivo** — upload de `.md` ou `.txt` (leitura pelo browser)
-3. **Transcrever mídia** — upload de áudio/vídeo → `POST /api/transcribe` (Whisper) → texto editável → salva
+2. **Importar arquivo** — upload `.md` ou `.txt` (leitura pelo browser)
+3. **Transcrever mídia** — upload de áudio/vídeo → `POST /api/transcribe` (Whisper)
 
 **Categorias (9):** produto, playbook, objeção-resposta, regra-comercial, diferencial, faq, template-followup, case-sucesso, script-copy
 
-**Metadados:** título, vertical, tags (chips), source_type, source_url
+### 9.10 Config Onboarding (`/onboarding-config`)
 
-Ao salvar → `POST /api/embeddings` gera embedding e atualiza a coluna `embedding` da row.
+**Acesso:** gestor only
 
-### 8.10 Configurações (`/settings`)
+- Trilha de temas (drag handle para reordenar)
+- Welcome message personalizada
+- Tom do copilot
+- Custom instructions
+- Singleton em `onboarding_config`
+
+### 9.11 Configurações (`/settings`)
 
 **Acesso:** todos os roles
 
 **Dados pessoais:** nome, email (read-only), vertical de foco, telefone, whatsapp_link, saudação padrão.
 
-**Style Wizard** (5 passos interativos):
-1. Tom de voz (4 opções)
-2. Emoji nas mensagens (3 opções)
-3. Tratamento do lead (4 opções + custom)
-4. Encerramento preferido (4 opções + custom)
-5. Exemplo de mensagem real
+**Style Wizard** (5 passos): tom de voz → emoji → tratamento do lead → encerramento → exemplo real.
 
-**Modo avançado:** textarea livre para escrever `style_notes` diretamente.
-
-`style_notes` é injetado no context builder para que o Copilot Vendas adapte copys ao tom do closer.
+**Modo avançado:** textarea livre para `style_notes` (injetado no system prompt via context builder).
 
 Salva via `PATCH /api/profile`.
 
-### 8.11 Login (`/login`)
+### 9.12 Login (`/login`)
 
 - 3 views: Login | Criar conta | Recuperar senha
-- Supabase Auth (email + senha, mínimo 6 chars)
-- Sem OAuth — apenas email/password
+- Supabase Auth (email + senha) — sem OAuth
 
 ---
 
-## 9. SYSTEM PROMPTS
+## 10. TODAS AS API ROUTES
 
-### 9.1 Copilot Vendas (`lib/ai/vendas-prompt.ts`)
+| Route | Método | O que faz |
+|-------|--------|-----------|
+| `/api/copilot-vendas` | POST | Streaming chat vendas (RAG + Groq) |
+| `/api/copilot-onboarding` | POST | Streaming chat onboarding |
+| `/api/profile` | PATCH | Atualizar perfil do usuário |
+| `/api/embeddings` | POST | Gera embedding e salva na coluna da tabela |
+| `/api/transcribe` | POST | Transcreve áudio/vídeo via Whisper |
+| `/api/copys` | GET | Lista user_copys: `{ mine, team }` |
+| `/api/copys` | POST | Cria (sem id) ou edita (com id) user_copys |
+| `/api/copys` | DELETE | Soft-delete (is_active=false) |
+| `/api/faq` | GET | Lista faq_items: `{ data }` |
+| `/api/faq` | POST | Cria ou edita faq_items |
+| `/api/faq` | DELETE | Soft-delete |
+| `/api/objecoes` | GET | Lista objection_patterns + user_objection_responses: `{ patterns, responses }` |
+| `/api/objecoes` | POST | Cria ou edita objection_patterns |
+| `/api/objecoes` | DELETE | Hard delete |
+| `/api/kb` | GET | Lista knowledge_base: `{ data }` |
+| `/api/kb` | POST | Cria ou edita knowledge_base |
+| `/api/kb` | DELETE | Soft-delete |
+| `/api/templates` | GET | Lista whatsapp_templates + favoritos: `{ templates, favorites }` |
+| `/api/templates` | POST | Cria ou edita whatsapp_templates |
+| `/api/templates` | DELETE | Soft-delete |
+| `/api/leads` | GET | Lista meus_leads do usuário: `{ data }` |
+| `/api/leads` | POST | Cria ou edita meus_leads |
+| `/api/leads` | DELETE | Hard delete |
+| `/api/big-numbers` | GET | Lista big_numbers: `{ data }` |
+| `/api/big-numbers` | POST | Cria ou edita big_numbers |
+| `/api/big-numbers` | DELETE | Hard delete |
+| `/api/verdadeiro-valor` | GET | Busca singleton + big_numbers: `{ vv, bns }` |
+| `/api/verdadeiro-valor` | POST | Upsert servidor-side (verifica existente antes de inserir) |
+| `/api/favorites` | POST | Adiciona favorito em user_favorite_templates |
+| `/api/favorites` | DELETE | Remove favorito |
+| `/api/user-objection-responses` | POST | Upsert resposta pessoal de objeção |
+| `/api/user-objection-responses` | DELETE | Remove resposta pessoal |
+
+---
+
+## 11. SYSTEM PROMPTS
+
+### 11.1 Copilot Vendas (`lib/ai/vendas-prompt.ts`)
 
 ```
 Você é o Copilot Comercial do Grupo Med-Review, segundo cérebro do time de vendas.
@@ -582,11 +685,12 @@ REGRAS INVIOLÁVEIS:
 5. Tom direto e consultivo — como gestor sênior que quer o closer fechando
 
 DIFERENCIAIS MED-REVIEW:
-- +5 anos de mercado, +26.000 alunos, +90% de satisfação
-- Professores aprovados em residência/concursos — não é coach, é quem passou na prova
-- IA personalizada por vertical: R1, Anestesiologia, Oftalmologia, Ortopedia
-- Método active recall + spaced repetition comprovado
-- Suporte completo + comunidade ativa de residentes
+[...texto sobre diferencial de personalização + bullets com stats...]
+
+USE O VERDADEIRO VALOR:
+Use os dados do "Verdadeiro Valor" e "Big Numbers" naturalmente nas suas respostas
+— em argumentação, contorno de objeções e propostas. Quando o closer pedir
+explicitamente dados ou diferenciais, reforce com mais ênfase.
 
 MODO ATUAL: {mode}
 Formato esperado: {format do mode}
@@ -597,80 +701,71 @@ CONTEXTO RELEVANTE:
 {contexto RAG — max 12.000 chars}
 ```
 
-**Formato esperado por mode:**
+**Formato por mode:**
 
-| Mode | Instrução de formato |
-|------|---------------------|
+| Mode | Instrução |
+|------|-----------|
 | diagnose | Perguntas estratégicas (máx 5/resposta) |
-| objeção | (1) validar → (2) ressignificar → (3) provar com dado ou case |
-| proposta | Montar + JSON `{"contexto","solucao","entregaveis","investimento","diferenciais","proximos_passos"}` |
-| produto | Benefícios + provas (aprovações, taxa de sucesso) |
-| follow-up | Humanizado, sem pressão, próximo passo concreto |
+| objeção | (1) valide → (2) ressignifique → (3) prove |
+| proposta | JSON `{"contexto","solucao","entregaveis","investimento","diferenciais","proximos_passos"}` |
+| produto | Benefícios + provas |
+| follow-up | Humanizado, sem pressão, próximo passo |
 | regra | Resposta precisa; se não souber, dizer explicitamente |
 | copys | Mensagem pronta usando tom das copys do time |
 | livre | Resposta direta (máx 350 palavras) |
 
-### 9.2 Copilot Onboarding (`lib/ai/onboarding-prompt.ts`)
+### 11.2 Copilot Onboarding (`lib/ai/onboarding-prompt.ts`)
 
 ```
-Você é o Copilot de Onboarding do Grupo Med-Review. Seu papel é guiar novos
-colaboradores com tom {tone}.
+Você é o Copilot de Onboarding do Grupo Med-Review. Tom: {tone}.
 
 REGRAS:
-1. Explique conceitos com exemplos práticos e situações reais da Med-Review
-2. Após cada explicação, faça uma pergunta ou mini-quiz para fixar o aprendizado
-3. Termine sempre com uma sugestão clara do que estudar a seguir
-4. Se a pergunta sair da trilha, responda brevemente e volte ao contexto
-5. Nunca invente informações — baseie-se apenas no contexto fornecido
+1. Explique conceitos com exemplos práticos reais da Med-Review
+2. Após cada explicação, faça pergunta ou mini-quiz
+3. Termine com sugestão do que estudar a seguir
+4. Se sair da trilha, responda brevemente e volte
+5. Nunca invente informações
+6. Ensine o verdadeiro valor usando os Big Numbers como referência
 
-SOBRE A MED-REVIEW:
-- +5 anos de mercado · +26.000 alunos · +90% de satisfação
-- Verticais: R1, Anestesiologia (Anest), Oftalmologia (Oft), Ortopedia (Ortop)
-- Método: active recall + spaced repetition + IA personalizada por vertical
-- Professores aprovados nas provas — ensinam o que realmente cai
+[SOBRE A MED-REVIEW — stats + verticais + método]
 
-TRILHA DE APRENDIZADO ({N} temas):
+TRILHA DE APRENDIZADO (N temas):
 1. Tema A
 2. Tema B  ← TEMA ATUAL
-3. Tema C
 ...
 
 TEMA ATUAL: "{título}" — {descrição}
-PRÓXIMO TEMA: "{título}" (sugira no final da resposta)
+PRÓXIMO TEMA: "{título}"
 
-INSTRUÇÕES DO GESTOR:
-{custom_instructions — se houver}
-
-CONTEXTO DA BASE DE CONHECIMENTO:
-{contexto RAG}
+INSTRUÇÕES DO GESTOR: {custom_instructions}
+CONTEXTO DA BASE DE CONHECIMENTO: {contexto RAG}
 ```
 
 ---
 
-## 10. EMBEDDING AUTOMÁTICO
-
-Toda vez que um documento é criado/editado em KB, FAQ, Objeções, Copys ou Templates:
+## 12. EMBEDDING AUTOMÁTICO
 
 ```typescript
-// Chamada do frontend após salvar o doc:
-await fetch('/api/embeddings', {
+// Chamado após cada save em KB, FAQ, Objeções, Copys, Templates:
+fetch('/api/embeddings', {
   method: 'POST',
   body: JSON.stringify({ table: 'knowledge_base', id: doc.id, content: doc.content }),
-})
+}).catch(() => {})  // fire-and-forget, sem await
 
-// app/api/embeddings/route.ts
-// Tabelas permitidas: knowledge_base, faq_items, user_copys, objection_patterns,
-//                    quote_examples, whatsapp_templates
-// Gera embedding via OpenAI → supabase.from(table).update({ embedding }).eq('id', id)
+// Tabelas permitidas: knowledge_base, faq_items, user_copys,
+//                    objection_patterns, quote_examples, whatsapp_templates
 ```
 
 ---
 
-## 11. PALETA DE CORES E DESIGN TOKENS
+## 13. PALETA DE CORES E DESIGN TOKENS
 
 Definidos em `app/globals.css` como CSS custom properties:
 
 ```css
+/* Cursor global */
+button, [role="button"], a { cursor: pointer; }
+
 /* Cores base */
 --background: #F9FAFB;
 --foreground: #111827;
@@ -681,7 +776,7 @@ Definidos em `app/globals.css` como CSS custom properties:
 --primary-light: #EEF2FF;
 
 /* Sidebar */
---bg-sidebar: #1E1B4B;          /* gradient start */
+--bg-sidebar: #1E1B4B;
 --bg-sidebar-hover: #312E81;
 --bg-sidebar-active: #4338CA;
 
@@ -712,33 +807,35 @@ Definidos em `app/globals.css` como CSS custom properties:
 - Cards: `bg-white border border-[#E5E7EB] rounded-xl shadow-sm`
 - Sidebar: gradiente `#1E1B4B → #2D2A7A`, 240px
 - Botões primários: `bg-[#6366F1] hover:bg-[#4F46E5] rounded-lg transition-all duration-150`
-- Inputs: `border rounded-lg focus:ring-2 focus:ring-indigo-500`
+- Inputs: `border rounded-lg focus:ring-2 focus:ring-indigo-200 outline-none`
 - Badges (verticais): pills `rounded-full px-2 py-0.5` com cor por vertical
 - Chat user: `bg-[#EEF2FF] rounded-2xl` alinhado à direita
 - Chat copilot: `bg-white border rounded-2xl` alinhado à esquerda
-- Mobile: bottom nav 5 ícones principais + drawer com grid 4 colunas
+- Mobile: bottom nav 4 ícones + botão Menu (drawer com grid 4 colunas)
 
 ---
 
-## 12. GUIA DE ALIMENTAÇÃO DA BASE
+## 14. GUIA DE ALIMENTAÇÃO DA BASE
 
 | Onde subir | O que colocar | Módulo |
 |-----------|---------------|--------|
-| **Knowledge Base** | Tudo sobre produtos (R1, Anest, Oft, Ortop), metodologia, diferenciais, playbooks de venda, scripts, cases de sucesso, regras comerciais, políticas | `/kb` — tab Escrever/Importar/Transcrever |
-| **FAQ** | Perguntas frequentes do lead ("qual a diferença entre X e Y?", "posso parcelar?") e dúvidas internas do time | `/faq` — gestor valida antes de entrar no RAG |
-| **Matriz de Objeções** | Cada objeção real que o lead usa: significado real + resposta vencedora + o que não dizer + win rate | `/objecoes` |
-| **Copys** | Mensagens que o time já usou e funcionaram por categoria (abertura, follow-up, fechamento…) | `/copys` |
-| **Templates WhatsApp** | Templates de WhatsApp reusáveis por momento (reengajamento, pós-evento, campanha…) | `/templates` |
-| **Quote Examples** | Orçamentos enviados marcados como win/loss (gerados pelo Copilot mode `proposta`) | Automático via QuoteCard |
+| **Knowledge Base** | Tudo sobre produtos, metodologia, diferenciais, playbooks, scripts, cases, regras comerciais | `/kb` — Escrever / Importar / Transcrever |
+| **Verdadeiro Valor** | Texto editorial sobre o diferencial real da Med-Review (Markdown) | `/verdadeiro-valor` → botão Editar (gestor) |
+| **Big Numbers** | Números de impacto: alunos, taxa de aprovação, satisfação, anos de mercado | `/verdadeiro-valor` → "+ Novo número" (gestor) |
+| **FAQ** | Perguntas frequentes do lead e dúvidas internas — gestor valida antes de entrar no RAG | `/faq` |
+| **Matriz de Objeções** | Objeção real + resposta vencedora + o que não dizer + win rate | `/objecoes` |
+| **Copys** | Mensagens que funcionaram por categoria (abertura, follow-up, fechamento…) | `/copys` |
+| **Templates WhatsApp** | Templates reusáveis por momento (reengajamento, campanha, pós-evento…) | `/templates` |
+| **Quote Examples** | Orçamentos win/loss (gerados automaticamente pelo QuoteCard no modo proposta) | Automático |
 
-**Regra de ouro:** quanto mais a base tiver, mais preciso o RAG. Subir pelo menos 20-30 docs de KB antes de usar em produção.
+**Regra de ouro:** subir pelo menos 20-30 docs de KB antes de usar em produção. Quanto mais a base tiver, mais preciso o RAG.
 
 ---
 
-## 13. DEPLOY — VERCEL
+## 15. DEPLOY — VERCEL
 
-1. Conectar repo no Vercel (main branch → prod, PRs → preview)
-2. Configurar as 5 variáveis de ambiente no painel Vercel:
+1. Conectar repo no Vercel (main → prod)
+2. Variáveis de ambiente (5):
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
@@ -746,13 +843,10 @@ Definidos em `app/globals.css` como CSS custom properties:
    - `OPENAI_API_KEY`
 3. Framework preset: Next.js
 4. Build command: `next build`
-5. Sem configuração especial — tudo roda via Edge/Node Functions padrão do Vercel
-
-**Supabase:** RLS ativo em todas as tabelas. Service role key usada apenas nas API routes server-side (nunca no cliente). Admin client (`lib/supabase/admin.ts`) só usado em endpoints de embedding e transcrição.
 
 ---
 
-## 14. FASES DE CONSTRUÇÃO
+## 16. FASES DE CONSTRUÇÃO
 
 | Fase | Descrição | Status |
 |------|-----------|--------|
@@ -761,9 +855,11 @@ Definidos em `app/globals.css` como CSS custom properties:
 | 3 | RAG (embeddings + context-builder + Groq) + Copilot Vendas | ✅ |
 | 4 | Copilot Onboarding + Config do gestor | ✅ |
 | 5 | KB Admin (3 formas de entrada + embedding automático) | ✅ |
-| 6 | Copys & Macros + Templates WhatsApp (3 tabs, CRUD, embedding) | ✅ |
+| 6 | Copys & Macros + Templates WhatsApp (CRUD + embedding) | ✅ |
 | 7 | FAQ + Matriz de Objeções (CRUD + embedding + respostas pessoais) | ✅ |
 | 8 | No Radar (leads) + Settings (wizard de estilo) | ✅ |
+| 8.5 | Verdadeiro Valor (tela + Big Numbers + absorção nos copilots) | ✅ |
+| 8.6 | Migração total para API routes com admin client (fix RLS) | ✅ |
 | 9 | Seed — importar docs reais + embeddings em massa | ⏳ |
 | 10 | Polish final + Deploy Vercel | ⏳ |
 
