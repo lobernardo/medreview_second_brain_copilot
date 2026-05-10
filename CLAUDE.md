@@ -1,7 +1,7 @@
 # CLAUDE.md — Second Brain Med-Review
 
 > **Fonte de verdade do projeto. Leia antes de qualquer tarefa.**
-> **Versão:** 5.0 | Data: 09/05/2026
+> **Versão:** 5.1 | Data: 10/05/2026
 
 ---
 
@@ -31,7 +31,7 @@ Além dos copilots, o sistema oferece: Verdadeiro Valor, No Radar (leads), Copys
 | Font | Inter (@fontsource/inter) | 5.2.8 |
 | Auth | Supabase Auth via `@supabase/ssr` | ssr 0.10.2 |
 | Database | Supabase (PostgreSQL + pgvector) | supabase-js 2.105.3 |
-| AI Chat | Groq API — `llama-3.3-70b-versatile` | groq-sdk 1.1.2 |
+| AI Chat | OpenAI `gpt-4o-mini` (primário) + Groq `llama-3.3-70b-versatile` (fallback) | fetch direto |
 | AI Embeddings | OpenAI — `text-embedding-3-small` (1536 dims) | fetch direto |
 | AI Transcrição | OpenAI Whisper — `whisper-1` | fetch direto |
 | Markdown | react-markdown + remark-gfm | md 10.1.0 / gfm 4.0.1 |
@@ -86,16 +86,19 @@ SSE streaming → renderiza token a token no cliente
 Context Inspector mostra sources (título + similarity)
 ```
 
-### Chamada Groq (`lib/ai/groq-client.ts`)
+### Chamada LLM (`lib/ai/llm-client.ts`)
 
 ```typescript
-// callGroqStream({ systemPrompt, messages }) → ReadableStream
-fetch('https://api.groq.com/openai/v1/chat/completions', {
-  model: 'llama-3.3-70b-versatile',
-  temperature: 0.3,
-  max_tokens: 4096,
-  stream: true,
-})
+// callLLMStream({ systemPrompt, messages }) → ReadableStream
+// Tenta OpenAI gpt-4o-mini primeiro (timeout 15s); se falhar, fallback para Groq
+// callLLMJson({ systemPrompt, userMessage }) → string  (não-streaming, para process-document)
+// Logs: "[LLM] OpenAI failed, falling back to Groq: <erro>"
+
+// Primário: OpenAI gpt-4o-mini
+fetch('https://api.openai.com/v1/chat/completions', { model: 'gpt-4o-mini', stream: true, temperature: 0.3, max_tokens: 4096 })
+
+// Fallback automático: Groq llama-3.3-70b-versatile
+fetch('https://api.groq.com/openai/v1/chat/completions', { model: 'llama-3.3-70b-versatile', stream: true })
 ```
 
 ### Chamada Embeddings (`lib/ai/embeddings.ts`)
@@ -185,7 +188,7 @@ copilot-medreview/
 │
 ├── lib/
 │   ├── ai/
-│   │   ├── groq-client.ts             # callGroqStream() — streaming para Groq
+│   │   ├── llm-client.ts              # callLLMStream() + callLLMJson() — GPT-4o-mini + fallback Groq
 │   │   ├── embeddings.ts              # generateEmbedding() — OpenAI text-embedding-3-small
 │   │   ├── context-builder.ts         # buildContext() — orquestra RAG completo
 │   │   ├── vendas-prompt.ts           # buildVendasSystemPrompt(mode, context)

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { buildContext } from '@/lib/ai/context-builder'
 import { buildOnboardingSystemPrompt, type OnboardingConfig } from '@/lib/ai/onboarding-prompt'
-import { callGroqStream } from '@/lib/ai/groq-client'
+import { callLLMStream } from '@/lib/ai/llm-client'
 
 export const runtime = 'nodejs'
 
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     const historyMessages = messages.slice(-10)
     const allMessages = [...historyMessages, { role: 'user' as const, content: message }]
 
-    const groqStream = await callGroqStream({ systemPrompt, messages: allMessages })
+    const groqStream = await callLLMStream({ systemPrompt, messages: allMessages })
 
     const encoder = new TextEncoder()
     const sourcesEvent = `data: ${JSON.stringify({ type: 'sources', sources })}\n\n`
