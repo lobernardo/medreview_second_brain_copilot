@@ -1,3 +1,5 @@
+import type { UserProfile } from './context-builder'
+
 const MODE_RESPONSE_FORMAT: Record<string, string> = {
   diagnose: 'Faça perguntas estratégicas para mapear dores, urgência e fit. Máx 5 perguntas por resposta.',
   'objeção': 'Formato: (1) valide a objeção → (2) ressignifique → (3) prove com dado ou case real.',
@@ -9,8 +11,18 @@ const MODE_RESPONSE_FORMAT: Record<string, string> = {
   livre: 'Resposta direta e propositiva. Máx 350 palavras.',
 }
 
-export function buildVendasSystemPrompt(mode: string, context: string): string {
+export function buildVendasSystemPrompt(mode: string, context: string, profile?: UserProfile | null): string {
   const format = MODE_RESPONSE_FORMAT[mode] ?? MODE_RESPONSE_FORMAT.livre
+
+  const profileSection = profile
+    ? `\nPERSONALIZAÇÃO DO CLOSER:
+Nome: ${profile.name}
+Saudação padrão: ${profile.default_greeting || 'Olá'}
+Tom e estilo: ${profile.style_notes || 'Direto e consultivo'}
+Vertical de foco: ${profile.vertical_focus || 'Todas'}
+
+Adapte TODAS as suas respostas ao estilo descrito acima. Se o closer prefere tom informal, seja informal. Se prefere não usar emoji, não use. Se tem uma forma de fechar conversa, use ela nas sugestões de mensagem. As copys e frases prontas devem soar como se o closer tivesse escrito.\n`
+    : ''
 
   return `Você é o Copilot Comercial do Grupo Med-Review, segundo cérebro do time de vendas.
 
@@ -51,7 +63,7 @@ Em objeção de preço, a sequência é:
 6. Só depois, se necessário, mencionar condições de pagamento
 7. NUNCA oferecer desconto antes de gerar valor
 
-MODO ATUAL: ${mode}
+${profileSection}MODO ATUAL: ${mode}
 Formato esperado: ${format}
 
 Se identificar lacuna no contexto: 🔴 LACUNA IDENTIFICADA: [o que falta]

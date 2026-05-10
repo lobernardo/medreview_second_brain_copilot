@@ -1,3 +1,5 @@
+import type { UserProfile } from './context-builder'
+
 export interface TrailItem {
   order: number
   title: string
@@ -16,7 +18,8 @@ export interface OnboardingConfig {
 export function buildOnboardingSystemPrompt(
   config: OnboardingConfig | null,
   context: string,
-  currentTopicIndex = 0
+  currentTopicIndex = 0,
+  profile?: UserProfile | null
 ): string {
   const tone = config?.tone ?? 'didático e acolhedor'
   const customInstructions = config?.custom_instructions ?? ''
@@ -41,8 +44,17 @@ export function buildOnboardingSystemPrompt(
     ? '\nEste é o último tema. Ao final, parabenize o colaborador pela conclusão da trilha.'
     : ''
 
-  return `Você é o Copilot de Onboarding do Grupo Med-Review. Seu papel é guiar novos colaboradores com tom ${tone}.
+  const profileSection = profile
+    ? `\nPERSONALIZAÇÃO DO COLABORADOR:
+Nome: ${profile.name}
+Tom e estilo preferido: ${profile.style_notes || 'Didático e acolhedor'}
+Vertical de interesse: ${profile.vertical_focus || 'Ainda não definida'}
 
+Chame o colaborador pelo nome quando apropriado. Adapte a linguagem ao estilo dele.\n`
+    : ''
+
+  return `Você é o Copilot de Onboarding do Grupo Med-Review. Seu papel é guiar novos colaboradores com tom ${tone}.
+${profileSection}
 REGRAS:
 1. Explique conceitos com exemplos práticos e situações reais da Med-Review
 2. Após cada explicação, faça uma pergunta ou mini-quiz para fixar o aprendizado

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { generateEmbedding } from './embeddings'
+import type { Profile } from '@/lib/utils/types'
 
 export interface ContextSource {
   id: string
@@ -7,9 +8,12 @@ export interface ContextSource {
   similarity: number
 }
 
+export type UserProfile = Pick<Profile, 'name' | 'style_notes' | 'default_greeting' | 'vertical_focus'>
+
 export interface BuiltContext {
   context: string
   sources: ContextSource[]
+  profile: UserProfile | null
 }
 
 function getServiceClient() {
@@ -138,7 +142,6 @@ async function fetchVerdadeiroValor(supabase: SupabaseClient): Promise<string> {
     const { data: bns } = await supabase
       .from('big_numbers')
       .select('value, label, description, category, vertical')
-      .eq('is_active', true)
 
     const lines: string[] = []
 
@@ -162,6 +165,19 @@ async function fetchVerdadeiroValor(supabase: SupabaseClient): Promise<string> {
     return lines.join('\n\n')
   } catch {
     return ''
+  }
+}
+
+async function fetchUserProfile(supabase: SupabaseClient, userId: string): Promise<UserProfile | null> {
+  try {
+    const { data } = await supabase
+      .from('profiles')
+      .select('name, style_notes, default_greeting, vertical_focus')
+      .eq('id', userId)
+      .single()
+    return data ?? null
+  } catch {
+    return null
   }
 }
 
@@ -197,16 +213,17 @@ export async function buildContext(
   const parts: string[] = []
   const sources: ContextSource[] = []
 
-  const [vvBlock, embedding] = await Promise.all([
+  const [vvBlock, embedding, profile] = await Promise.all([
     fetchVerdadeiroValor(supabase),
     generateEmbedding(message).catch(() => null),
+    userId ? fetchUserProfile(supabase, userId) : Promise.resolve(null),
   ])
 
   if (vvBlock) parts.push(vvBlock)
 
   if (!embedding) {
     await fallbackTextSearch(supabase, message, parts, sources)
-    return { context: truncate(parts.join('\n\n---\n\n')), sources }
+    return { context: truncate(parts.join('\n\n---\n\n')), sources, profile }
   }
 
   const calls: Promise<void>[] = [
@@ -224,5 +241,5 @@ export async function buildContext(
     await fallbackTextSearch(supabase, message, parts, sources)
   }
 
-  return { context: truncate(parts.join('\n\n---\n\n')), sources }
+  return { context: truncate(parts.join('\n\n---\n\n')), sources, profile }
 }

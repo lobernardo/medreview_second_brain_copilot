@@ -50,12 +50,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'message required' }, { status: 400 })
     }
 
-    const [{ context, sources }, config] = await Promise.all([
+    const [{ context, sources, profile }, config] = await Promise.all([
       buildContext(message, 'onboarding', user_id),
       fetchOnboardingConfig(),
     ])
 
-    const systemPrompt = buildOnboardingSystemPrompt(config, context, current_topic_index)
+    const systemPrompt = buildOnboardingSystemPrompt(config, context, current_topic_index, profile)
 
     const historyMessages = messages.slice(-10)
     const allMessages = [...historyMessages, { role: 'user' as const, content: message }]

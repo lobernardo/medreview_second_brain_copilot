@@ -19,8 +19,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'message required' }, { status: 400 })
     }
 
-    const { context, sources } = await buildContext(message, mode, user_id)
-    const systemPrompt = buildVendasSystemPrompt(mode, context)
+    const { context, sources, profile } = await buildContext(message, mode, user_id)
+    const systemPrompt = buildVendasSystemPrompt(mode, context, profile)
 
     const historyMessages = messages.slice(-10)
     const allMessages = [...historyMessages, { role: 'user' as const, content: message }]
