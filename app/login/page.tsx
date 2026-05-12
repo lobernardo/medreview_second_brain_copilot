@@ -85,7 +85,9 @@ export default function LoginPage() {
     e.preventDefault()
     setResetLoading(true)
     const supabase = createClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail)
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/login`,
+    })
     setResetLoading(false)
     if (error) {
       setToast({ type: 'error', message: 'Erro ao enviar e-mail. Tente novamente.' })
