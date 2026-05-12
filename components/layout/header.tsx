@@ -6,18 +6,18 @@ import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/utils/types'
 
 const pageTitles: Record<string, string> = {
-  '/dashboard': 'Dashboard',
+  '/': 'Home',
   '/copilot-vendas': 'Copilot Vendas',
   '/copilot-onboarding': 'Copilot Onboarding',
   '/leads': 'No Radar',
-  '/logs': 'Logs',
   '/copys': 'Copys & Macros',
   '/templates': 'Templates',
   '/faq': 'FAQ',
   '/objecoes': 'Matriz de Objeções',
   '/kb': 'Knowledge Base',
-  '/priorities': 'Prioridades',
   '/verdadeiro-valor': 'Verdadeiro Valor',
+  '/agenda': 'Agenda',
+  '/produtos': 'Catálogo de Produtos',
   '/onboarding-config': 'Config Onboarding',
   '/settings': 'Configurações',
 }

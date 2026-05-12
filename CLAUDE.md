@@ -1,7 +1,7 @@
 # CLAUDE.md — Second Brain Med-Review
 
 > **Fonte de verdade do projeto. Leia antes de qualquer tarefa.**
-> **Versão:** 5.1 | Data: 10/05/2026
+> **Versão:** 5.2 | Data: 12/05/2026
 
 ---
 
@@ -119,19 +119,15 @@ model: whisper-1 | language: pt | response_format: text
 Limite: 25 MB | Formatos: mp3, m4a, wav, webm, mpga, mp4, mpeg
 ```
 
-### Verdadeiro Valor no Contexto (`lib/ai/context-builder.ts`)
+### Contexto Fixo no LLM (`lib/ai/context-builder.ts`)
 
-`fetchVerdadeiroValor()` é chamado em **toda** consulta (qualquer mode, vendas e onboarding):
-- Busca `verdadeiro_valor` (singleton, registro mais recente)
-- Busca todos os `big_numbers`
-- Formata como bloco fixo no topo do contexto:
-  ```
-  VERDADEIRO VALOR DA MED-REVIEW:
-  {texto}
+Três blocos são injetados em **toda** consulta (qualquer mode), antes do RAG vetorial:
 
-  BIG NUMBERS:
-  • {value} — {label}: {description} ({vertical}) [{category}]
-  ```
+1. **`fetchVerdadeiroValor()`** — busca `verdadeiro_valor` + `big_numbers`
+2. **`fetchExamDates()`** — busca `exam_dates` ativas, filtra apenas próximas (>= -7 dias)
+3. **`fetchUpcomingEvents()`** — busca `company_events` nos próximos 30 dias
+
+Todos os três são resolvidos em `Promise.all` antes das buscas vetoriais. Se a tabela não existir, retornam string vazia (try/catch silencioso).
 
 ---
 
@@ -141,7 +137,7 @@ Limite: 25 MB | Formatos: mp3, m4a, wav, webm, mpga, mp4, mpeg
 copilot-medreview/
 ├── app/
 │   ├── layout.tsx                      # Root layout com AppShell + auth check
-│   ├── page.tsx                        # Redirect → /copilot-vendas
+│   ├── page.tsx                        # Home dashboard (provas + eventos + acesso rápido)
 │   ├── globals.css                     # Design tokens CSS + cursor-pointer global + Tailwind
 │   ├── login/page.tsx                  # Auth: login / criar conta / reset senha
 │   ├── copilot-vendas/page.tsx         # Chat — Copilot de Vendas (8 modos)
@@ -154,6 +150,8 @@ copilot-medreview/
 │   ├── objecoes/page.tsx               # Matriz de objeções com respostas pessoais
 │   ├── kb/page.tsx                     # Knowledge Base (texto / import / transcrição)
 │   ├── verdadeiro-valor/page.tsx       # Verdadeiro Valor + Big Numbers
+│   ├── agenda/page.tsx                 # Provas & Datas + Calendário de Eventos (gestor edita)
+│   ├── produtos/page.tsx               # Catálogo de Produtos (form estruturado → KB category=produto)
 │   ├── settings/page.tsx               # Perfil + wizard de estilo do copilot
 │   └── api/
 │       ├── copilot-vendas/route.ts     # POST — streaming chat vendas (RAG + Groq)
@@ -170,7 +168,10 @@ copilot-medreview/
 │       ├── big-numbers/route.ts        # GET, POST, DELETE — big_numbers
 │       ├── verdadeiro-valor/route.ts   # GET, POST — verdadeiro_valor (singleton)
 │       ├── favorites/route.ts          # POST, DELETE — user_favorite_templates
-│       └── user-objection-responses/route.ts  # POST, DELETE — user_objection_responses
+│       ├── user-objection-responses/route.ts  # POST, DELETE — user_objection_responses
+│       ├── exam-dates/route.ts         # GET, POST, DELETE — exam_dates
+│       ├── events/route.ts             # GET, POST, DELETE — company_events
+│       └── produtos/route.ts           # GET, POST, DELETE — knowledge_base (category=produto)
 │
 ├── components/
 │   ├── layout/
@@ -241,12 +242,15 @@ export async function GET/POST/DELETE(request: Request) {
 ```
 Item                  | Rota                | Ícone            | closer | gestor | onboarding
 ----------------------|---------------------|------------------|--------|--------|----------
+Home                  | /                   | LayoutDashboard  |  ✅    |  ✅    |  ✅
 Copilot Vendas        | /copilot-vendas     | Bot              |  ✅    |  ✅    |
 Copilot Onboarding    | /copilot-onboarding | GraduationCap    |        |  ✅    |  ✅
 Verdadeiro Valor      | /verdadeiro-valor   | Trophy           |  ✅    |  ✅    |  ✅
+Agenda                | /agenda             | CalendarDays     |  ✅    |  ✅    |  ✅
 No Radar              | /leads              | NotebookPen      |  ✅    |  ✅    |
 Copys                 | /copys              | Mail             |  ✅    |  ✅    |
 Templates             | /templates          | MessageSquareText|  ✅    |  ✅    |
+Produtos              | /produtos           | Package          |  ✅    |  ✅    |  ✅
 FAQ                   | /faq                | HelpCircle       |  ✅    |  ✅    |  ✅
 Matriz de Objeções    | /objecoes           | Shield           |  ✅    |  ✅    |
 Knowledge Base        | /kb                 | BookOpen         |  ✅    |  ✅    |  ✅
@@ -491,6 +495,46 @@ match_quotes(query_embedding vector, match_count int, match_threshold float)
 search_knowledge_base_text(search_query text)   -- fallback ILIKE
 ```
 
+### 8.3 Novas tabelas (Fase 8.7)
+
+```sql
+-- 15. exam_dates
+create table exam_dates (
+  id uuid default gen_random_uuid() primary key,
+  vertical text check (vertical in ('R1', 'Anest', 'Oft', 'Ortop')) not null,
+  name text not null,
+  exam_date date not null,
+  registration_start date,
+  registration_end date,
+  notes text,
+  monday_item_id text,       -- placeholder: URL ou ID do item no Monday.com
+  is_active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- 16. company_events
+create table company_events (
+  id uuid default gen_random_uuid() primary key,
+  type text check (type in ('lançamento', 'campanha', 'evento', 'deadline', 'outro')) not null,
+  title text not null,
+  description text,
+  event_date date not null,
+  end_date date,
+  verticals text[],
+  responsible text,
+  link text,
+  monday_item_id text,       -- placeholder: URL ou ID do item no Monday.com
+  is_active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Produtos: salvos em knowledge_base com category='produto'
+-- tags[0] = status ('ativo' | 'inativo' | 'beta')
+-- Sem tabela nova — reusa knowledge_base + match_knowledge_base existente
+```
+
 ---
 
 ## 9. MÓDULOS E TELAS
@@ -632,6 +676,50 @@ Salva via `PATCH /api/profile`.
 - 3 views: Login | Criar conta | Recuperar senha
 - Supabase Auth (email + senha) — sem OAuth
 
+### 9.13 Home (`/`)
+
+**Acesso:** todos os roles
+
+Dashboard de boas-vindas com:
+- Saudação contextual (bom dia/tarde/noite) com nome do usuário
+- **Provas próximas** — próximas 4 provas com countdown colorido (>90d verde, 31-90d âmbar, ≤30d vermelho)
+- **Próximos 30 dias** — eventos da tabela `company_events` dentro da janela de 30 dias
+- **Acesso rápido** — grid de 4 cards com links para os módulos principais do role
+
+### 9.14 Agenda (`/agenda`)
+
+**Acesso:** todos os roles veem; gestor edita
+
+**Seção 1 — Provas & Datas:**
+- Lista de exames com countdown pill colorido por urgência
+- Filtro por vertical
+- Exames passados collapsíveis ("X provas realizadas")
+- Campo `monday_item_id`: aceita URL do Monday — se preenchido, exibe chip "Monday" clicável
+- Gestor: CRUD completo via modal (campos: vertical, nome, data_prova, início/fim inscrições, notas, link Monday)
+
+**Seção 2 — Calendário de Eventos:**
+- Lista cronológica agrupada por mês
+- Tipos: lançamento (indigo), campanha (violeta), evento (cyan), deadline (vermelho), outro (cinza)
+- Multi-select de verticais no form
+- Campo `monday_item_id` igual às provas (placeholder Monday)
+- Gestor: CRUD completo via modal
+
+**Copilot:** `fetchExamDates()` e `fetchUpcomingEvents()` injetam dados como blocos fixos no contexto em toda consulta.
+
+### 9.15 Produtos (`/produtos`)
+
+**Acesso:** todos os roles veem; gestor edita
+
+- Catálogo de produtos com form estruturado (13 campos)
+- Salva na tabela `knowledge_base` com `category='produto'`, `tags=[status]`
+- `title` = nome do produto, `vertical` = vertical médica, conteúdo = Markdown gerado do form
+- Quando edita: faz parse do Markdown via regex para re-popular os campos
+- Ao salvar: dispara `POST /api/embeddings` (fire-and-forget) para indexar no RAG
+- Status: ativo (verde), inativo (cinza), beta (indigo)
+- O `match_knowledge_base` já indexa produtos — entram automaticamente no RAG do Copilot
+
+**`/api/produtos`:** GET filtra `knowledge_base WHERE category='produto'`; POST formata os campos em Markdown e salva via KB; DELETE soft-delete.
+
 ---
 
 ## 10. TODAS AS API ROUTES
@@ -670,6 +758,15 @@ Salva via `PATCH /api/profile`.
 | `/api/favorites` | DELETE | Remove favorito |
 | `/api/user-objection-responses` | POST | Upsert resposta pessoal de objeção |
 | `/api/user-objection-responses` | DELETE | Remove resposta pessoal |
+| `/api/exam-dates` | GET | Lista exam_dates ativas ordenadas por data |
+| `/api/exam-dates` | POST | Cria ou edita exam_dates |
+| `/api/exam-dates` | DELETE | Soft-delete (is_active=false) |
+| `/api/events` | GET | Lista company_events ativos ordenados por data |
+| `/api/events` | POST | Cria ou edita company_events |
+| `/api/events` | DELETE | Soft-delete (is_active=false) |
+| `/api/produtos` | GET | Lista knowledge_base WHERE category='produto': `{ data }` |
+| `/api/produtos` | POST | Formata form → Markdown, salva em knowledge_base (category=produto) |
+| `/api/produtos` | DELETE | Soft-delete (is_active=false) |
 
 ---
 
@@ -863,6 +960,7 @@ button, [role="button"], a { cursor: pointer; }
 | 8 | No Radar (leads) + Settings (wizard de estilo) | ✅ |
 | 8.5 | Verdadeiro Valor (tela + Big Numbers + absorção nos copilots) | ✅ |
 | 8.6 | Migração total para API routes com admin client (fix RLS) | ✅ |
+| 8.7 | Agenda (Provas + Eventos) + Catálogo de Produtos + Home dashboard | ✅ |
 | 9 | Seed — importar docs reais + embeddings em massa | ⏳ |
 | 10 | Polish final + Deploy Vercel | ⏳ |
 

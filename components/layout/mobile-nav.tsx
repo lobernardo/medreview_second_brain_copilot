@@ -17,6 +17,9 @@ import {
   X,
   MessageSquareText,
   Trophy,
+  LayoutDashboard,
+  CalendarDays,
+  Package,
 } from 'lucide-react'
 import type { Profile } from '@/lib/utils/types'
 
@@ -29,6 +32,7 @@ interface NavItem {
 }
 
 const ALL_ITEMS: Record<string, NavItem> = {
+  home:       { href: '/',                  label: 'Home',        icon: LayoutDashboard },
   vendas:     { href: '/copilot-vendas',    label: 'Copilot',     icon: Bot },
   onboarding: { href: '/copilot-onboarding', label: 'Onboarding', icon: GraduationCap },
   copys:      { href: '/copys',             label: 'Copys',       icon: Mail },
@@ -37,7 +41,9 @@ const ALL_ITEMS: Record<string, NavItem> = {
   faq:        { href: '/faq',               label: 'FAQ',         icon: HelpCircle },
   objecoes:   { href: '/objecoes',          label: 'Objeções',    icon: Shield },
   kb:         { href: '/kb',                label: 'KB',          icon: BookOpen },
-  valor:      { href: '/verdadeiro-valor',   label: 'Valor',       icon: Trophy },
+  valor:      { href: '/verdadeiro-valor',  label: 'Valor',       icon: Trophy },
+  agenda:     { href: '/agenda',            label: 'Agenda',      icon: CalendarDays },
+  produtos:   { href: '/produtos',          label: 'Produtos',    icon: Package },
   config:     { href: '/onboarding-config', label: 'Config',      icon: Settings2 },
   settings:   { href: '/settings',          label: 'Config',      icon: Settings },
 }
@@ -49,9 +55,9 @@ const BOTTOM_ITEMS: Record<Role, string[]> = {
 }
 
 const DRAWER_ITEMS: Record<Role, string[]> = {
-  closer:     ['valor', 'templates', 'objecoes', 'kb', 'settings'],
-  gestor:     ['valor', 'templates', 'faq', 'objecoes', 'kb', 'config', 'settings'],
-  onboarding: ['valor'],
+  closer:     ['home', 'agenda', 'produtos', 'valor', 'templates', 'objecoes', 'kb', 'settings'],
+  gestor:     ['home', 'agenda', 'produtos', 'valor', 'templates', 'faq', 'objecoes', 'kb', 'config', 'settings'],
+  onboarding: ['home', 'agenda', 'produtos', 'valor'],
 }
 
 export default function MobileNav({ profile }: { profile: Profile | null }) {

@@ -14,6 +14,9 @@ import {
   Settings,
   MessageSquareText,
   Trophy,
+  LayoutDashboard,
+  CalendarDays,
+  Package,
 } from 'lucide-react'
 
 import type { Profile } from '@/lib/utils/types'
@@ -28,12 +31,15 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { href: '/', label: 'Home', icon: LayoutDashboard, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/copilot-vendas', label: 'Copilot Vendas', icon: Bot, roles: ['closer', 'gestor'] },
   { href: '/copilot-onboarding', label: 'Copilot Onboarding', icon: GraduationCap, roles: ['onboarding', 'gestor'] },
   { href: '/verdadeiro-valor', label: 'Verdadeiro Valor', icon: Trophy, roles: ['closer', 'gestor', 'onboarding'] },
+  { href: '/agenda', label: 'Agenda', icon: CalendarDays, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/leads', label: 'No Radar', icon: NotebookPen, roles: ['closer', 'gestor'] },
   { href: '/copys', label: 'Copys', icon: Mail, roles: ['closer', 'gestor'] },
   { href: '/templates', label: 'Templates', icon: MessageSquareText, roles: ['closer', 'gestor'] },
+  { href: '/produtos', label: 'Produtos', icon: Package, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/faq', label: 'FAQ', icon: HelpCircle, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/objecoes', label: 'Matriz de Objeções', icon: Shield, roles: ['closer', 'gestor'] },
   { href: '/kb', label: 'Knowledge Base', icon: BookOpen, roles: ['closer', 'gestor', 'onboarding'] },
@@ -72,7 +78,7 @@ export default function Sidebar({ profile }: SidebarProps) {
           const Icon = item.icon
           const isActive =
             pathname === item.href ||
-            (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))
+            (item.href !== '/' && pathname.startsWith(item.href + '/'))
 
           return (
             <Link

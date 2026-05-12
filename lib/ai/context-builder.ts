@@ -130,6 +130,78 @@ async function matchQuotes(supabase: SupabaseClient, embedding: number[], parts:
   } catch { /* RPC not available yet */ }
 }
 
+function fmtCtxDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-')
+  return `${d}/${m}/${y}`
+}
+
+function daysUntilCtx(dateStr: string): number {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.ceil((new Date(dateStr + 'T00:00:00').getTime() - today.getTime()) / 86400000)
+}
+
+async function fetchExamDates(supabase: SupabaseClient): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from('exam_dates')
+      .select('vertical, name, exam_date, registration_start, registration_end')
+      .eq('is_active', true)
+      .order('exam_date', { ascending: true })
+
+    if (!data?.length) return ''
+
+    const upcoming = data.filter((e: any) => daysUntilCtx(e.exam_date) >= -7)
+    if (!upcoming.length) return ''
+
+    const lines = upcoming.map((e: any) => {
+      const days = daysUntilCtx(e.exam_date)
+      let line = `• ${e.vertical} — ${e.name}: ${fmtCtxDate(e.exam_date)} (em ${days} dias)`
+      if (e.registration_start) {
+        line += `\n  Inscrições: ${fmtCtxDate(e.registration_start)}`
+        if (e.registration_end) line += ` a ${fmtCtxDate(e.registration_end)}`
+      }
+      return line
+    })
+
+    return `DATAS DE PROVAS:\n${lines.join('\n')}`
+  } catch {
+    return ''
+  }
+}
+
+async function fetchUpcomingEvents(supabase: SupabaseClient): Promise<string> {
+  try {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const limit = new Date(today.getTime() + 30 * 86400000)
+    const todayStr = today.toISOString().slice(0, 10)
+    const limitStr = limit.toISOString().slice(0, 10)
+
+    const { data } = await supabase
+      .from('company_events')
+      .select('type, title, description, event_date, verticals, responsible')
+      .eq('is_active', true)
+      .gte('event_date', todayStr)
+      .lte('event_date', limitStr)
+      .order('event_date', { ascending: true })
+
+    if (!data?.length) return ''
+
+    const lines = data.map((e: any) => {
+      const days = daysUntilCtx(e.event_date)
+      let line = `• [${e.type}] ${e.title}: ${fmtCtxDate(e.event_date)} (em ${days} dias)`
+      if (e.verticals?.length) line += `\n  Verticais: ${e.verticals.join(', ')}`
+      if (e.description) line += `\n  ${e.description}`
+      return line
+    })
+
+    return `EVENTOS PRÓXIMOS (30 dias):\n${lines.join('\n')}`
+  } catch {
+    return ''
+  }
+}
+
 async function fetchVerdadeiroValor(supabase: SupabaseClient): Promise<string> {
   try {
     const { data: vv } = await supabase
@@ -213,13 +285,17 @@ export async function buildContext(
   const parts: string[] = []
   const sources: ContextSource[] = []
 
-  const [vvBlock, embedding, profile] = await Promise.all([
+  const [vvBlock, examBlock, eventBlock, embedding, profile] = await Promise.all([
     fetchVerdadeiroValor(supabase),
+    fetchExamDates(supabase),
+    fetchUpcomingEvents(supabase),
     generateEmbedding(message).catch(() => null),
     userId ? fetchUserProfile(supabase, userId) : Promise.resolve(null),
   ])
 
   if (vvBlock) parts.push(vvBlock)
+  if (examBlock) parts.push(examBlock)
+  if (eventBlock) parts.push(eventBlock)
 
   if (!embedding) {
     await fallbackTextSearch(supabase, message, parts, sources)
