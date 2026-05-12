@@ -76,7 +76,7 @@ export default function LoginPage() {
       setLoginError(error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message)
       setLoginLoading(false)
     } else {
-      router.push('/copilot-vendas')
+      router.push('/')
       router.refresh()
     }
   }
