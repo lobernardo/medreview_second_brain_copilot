@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -30,7 +30,6 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const isLoginPage = request.nextUrl.pathname === '/login'
-  const isIndexRoute = ['/'].includes(request.nextUrl.pathname)
 
   if (!user && !isLoginPage) {
     const url = request.nextUrl.clone()
@@ -38,9 +37,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (user && (isLoginPage || isIndexRoute)) {
+  if (user && isLoginPage) {
     const url = request.nextUrl.clone()
-    url.pathname = '/copilot-vendas'
+    url.pathname = '/'
     return NextResponse.redirect(url)
   }
 

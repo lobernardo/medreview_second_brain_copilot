@@ -1,7 +1,7 @@
 # CLAUDE.md — Second Brain Med-Review
 
 > **Fonte de verdade do projeto. Leia antes de qualquer tarefa.**
-> **Versão:** 5.2 | Data: 12/05/2026
+> **Versão:** 5.3 | Data: 14/05/2026
 
 ---
 
@@ -34,12 +34,13 @@ Além dos copilots, o sistema oferece: Verdadeiro Valor, No Radar (leads), Copys
 | AI Chat | OpenAI `gpt-4o-mini` (primário) + Groq `llama-3.3-70b-versatile` (fallback) | fetch direto |
 | AI Embeddings | OpenAI — `text-embedding-3-small` (1536 dims) | fetch direto |
 | AI Transcrição | OpenAI Whisper — `whisper-1` | fetch direto |
+| Groq SDK | `groq-sdk` — instalado no package.json, mas **não usado** (llm-client usa fetch direto) | 1.1.2 |
 | Markdown | react-markdown + remark-gfm | md 10.1.0 / gfm 4.0.1 |
 | Datas | date-fns | 4.1.0 |
 | Deploy | Vercel | — |
 
 > **Não há shadcn CLI configurado** — componentes UI foram escritos manualmente seguindo o padrão shadcn.
-> **Sem middleware.ts** — proteção de rotas feita no layout raiz via `app/layout.tsx`.
+> **`middleware.ts`** — protege todas as rotas: não autenticado → redirect `/login`; autenticado em `/login` → redirect `/`.
 
 ---
 
@@ -159,6 +160,7 @@ copilot-medreview/
 │       ├── profile/route.ts            # PATCH — atualizar perfil do usuário
 │       ├── embeddings/route.ts         # POST — gera embedding e salva na tabela
 │       ├── transcribe/route.ts         # POST — transcreve áudio/vídeo via Whisper
+│       ├── process-document/route.ts   # POST — analisa conteúdo via LLM; sugere categoria/vertical/tags/título/chunks
 │       ├── copys/route.ts              # GET, POST, DELETE — user_copys
 │       ├── faq/route.ts                # GET, POST, DELETE — faq_items
 │       ├── objecoes/route.ts           # GET, POST, DELETE — objection_patterns + user_objection_responses
@@ -647,6 +649,11 @@ Bloco de notas pessoal. Cada closer vê só os seus (filtrado por `user_id` no s
 2. **Importar arquivo** — upload `.md` ou `.txt` (leitura pelo browser)
 3. **Transcrever mídia** — upload de áudio/vídeo → `POST /api/transcribe` (Whisper)
 
+**Fluxo de salvar (3 steps):**
+- `form` → usuário preenche título, categoria, vertical, conteúdo e tags
+- `processing` → chama `POST /api/process-document` com o conteúdo; LLM retorna sugestões de categoria, vertical, tags, título, conteúdo formatado em Markdown e, se >2000 palavras, `should_split=true` com array `chunks`
+- `review` → usuário revisa/ajusta as sugestões e confirma; ao confirmar, salva na KB (um doc ou múltiplos chunks se `should_split`)
+
 **Categorias (9):** produto, playbook, objeção-resposta, regra-comercial, diferencial, faq, template-followup, case-sucesso, script-copy
 
 ### 9.10 Config Onboarding (`/onboarding-config`)
@@ -758,6 +765,7 @@ Dashboard de boas-vindas com:
 | `/api/favorites` | DELETE | Remove favorito |
 | `/api/user-objection-responses` | POST | Upsert resposta pessoal de objeção |
 | `/api/user-objection-responses` | DELETE | Remove resposta pessoal |
+| `/api/process-document` | POST | Analisa conteúdo com LLM; retorna `suggested_category`, `suggested_vertical`, `suggested_tags`, `suggested_title`, `formatted_content`, `should_split`, `chunks` |
 | `/api/exam-dates` | GET | Lista exam_dates ativas ordenadas por data |
 | `/api/exam-dates` | POST | Cria ou edita exam_dates |
 | `/api/exam-dates` | DELETE | Soft-delete (is_active=false) |
