@@ -268,7 +268,7 @@ export default function SettingsPage() {
 
   // Profile fields
   const [name, setName] = useState('')
-  const [verticalFocus, setVerticalFocus] = useState('')
+  const [verticalFocuses, setVerticalFocuses] = useState<string[]>([])
   const [phone, setPhone] = useState('')
   const [whatsappLink, setWhatsappLink] = useState('')
   const [defaultGreeting, setDefaultGreeting] = useState('')
@@ -284,7 +284,11 @@ export default function SettingsPage() {
     if (contextProfile) {
       setProfile(contextProfile)
       setName(contextProfile.name)
-      setVerticalFocus(contextProfile.vertical_focus ?? '')
+      setVerticalFocuses(
+        contextProfile.vertical_focus
+          ? contextProfile.vertical_focus.split(',').filter(Boolean)
+          : []
+      )
       setPhone(contextProfile.phone ?? '')
       setWhatsappLink(contextProfile.whatsapp_link ?? '')
       setDefaultGreeting(contextProfile.default_greeting ?? '')
@@ -313,7 +317,7 @@ export default function SettingsPage() {
     try {
       const payload = {
         name: name.trim(),
-        vertical_focus: verticalFocus || null,
+        vertical_focus: verticalFocuses.length > 0 ? verticalFocuses.join(',') : null,
         phone: phone || null,
         whatsapp_link: whatsappLink || null,
         default_greeting: defaultGreeting || null,
@@ -377,22 +381,36 @@ export default function SettingsPage() {
             style={{ borderColor: '#E5E7EB', background: '#F9FAFB', color: '#9CA3AF' }} />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Vertical de foco</label>
-            <select value={verticalFocus} onChange={e => setVerticalFocus(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-indigo-200 outline-none bg-white"
-              style={{ borderColor: '#E5E7EB' }}>
-              <option value="">Nenhuma</option>
-              {VERTICALS.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Vertical de foco</label>
+          <div className="flex flex-wrap gap-2">
+            {VERTICALS.map(v => {
+              const active = verticalFocuses.includes(v)
+              return (
+                <button
+                  key={v} type="button"
+                  onClick={() => setVerticalFocuses(prev =>
+                    prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]
+                  )}
+                  className="px-3 py-1.5 rounded-lg border text-sm font-medium transition-all duration-150"
+                  style={active
+                    ? { borderColor: '#6366F1', background: '#EEF2FF', color: '#4338CA' }
+                    : { borderColor: '#E5E7EB', background: '#FFFFFF', color: '#6B7280' }
+                  }
+                >
+                  {v}
+                </button>
+              )
+            })}
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Telefone</label>
-            <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(11) 9xxxx-xxxx"
-              className="w-full px-3 py-2 border rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-indigo-200 outline-none"
-              style={{ borderColor: '#E5E7EB' }} />
-          </div>
+          <p className="text-[11px] text-gray-400">Selecione uma ou mais verticais</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Telefone</label>
+          <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(11) 9xxxx-xxxx"
+            className="w-full px-3 py-2 border rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-indigo-200 outline-none"
+            style={{ borderColor: '#E5E7EB' }} />
         </div>
 
         <div className="space-y-1.5">

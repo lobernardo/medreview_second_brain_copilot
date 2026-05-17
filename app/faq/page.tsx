@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Plus, Check, Edit2, Trash2, X, AlertCircle, Loader2, Search } from 'lucide-react'
+import { Plus, Check, Edit2, Trash2, X, AlertCircle, Loader2 } from 'lucide-react'
 import { VerticalBadge } from '@/components/ui/badge'
 import { VERTICALS } from '@/lib/utils/constants'
 import { SkeletonList } from '@/components/ui/skeleton'
@@ -36,6 +36,17 @@ interface FaqForm {
   vertical: string
   category: string
 }
+
+const FAQ_CATEGORIES = [
+  'Produto',
+  'Provas & Datas',
+  'Pagamento',
+  'Acesso & Plataforma',
+  'Processo Comercial',
+  'Pós-venda',
+  'Regras Internas',
+  'Outros',
+]
 
 const EMPTY_FORM: FaqForm = { faq_type: 'interno', question: '', answer: '', vertical: '', category: '' }
 
@@ -77,7 +88,7 @@ export default function FaqPage() {
   const filtered = faqs.filter(f => {
     if (f.faq_type !== activeTab) return false
     if (filterVertical && f.vertical !== filterVertical) return false
-    if (filterCategory && !(f.category ?? '').toLowerCase().includes(filterCategory.toLowerCase())) return false
+    if (filterCategory && f.category !== filterCategory) return false
     if (filterStatus && f.status !== filterStatus) return false
     return true
   })
@@ -207,10 +218,10 @@ export default function FaqPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input type="text" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} placeholder="Filtrar por categoria…" className="pl-9 pr-3 py-2 border rounded-lg text-sm text-gray-800 focus:ring-2 focus:ring-indigo-200 outline-none bg-white" style={{ borderColor: '#E5E7EB', minWidth: '190px' }} />
-        </div>
+        <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-3 py-2 border rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-indigo-200 outline-none bg-white" style={{ borderColor: '#E5E7EB' }}>
+          <option value="">Todas as categorias</option>
+          {FAQ_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
         <select value={filterVertical} onChange={(e) => setFilterVertical(e.target.value)} className="px-3 py-2 border rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-indigo-200 outline-none bg-white" style={{ borderColor: '#E5E7EB' }}>
           <option value="">Todas as verticais</option>
           {VERTICALS.map(v => <option key={v} value={v}>{v}</option>)}
@@ -317,7 +328,10 @@ export default function FaqPage() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Categoria</label>
-                  <input type="text" value={form.category} onChange={(e) => setForm(p => ({ ...p, category: e.target.value }))} placeholder="Ex: preço, acesso…" className="w-full px-3 py-2 border rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-indigo-200 outline-none" style={{ borderColor: '#E5E7EB' }} />
+                  <select value={form.category} onChange={(e) => setForm(p => ({ ...p, category: e.target.value }))} className="w-full px-3 py-2 border rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-indigo-200 outline-none bg-white" style={{ borderColor: '#E5E7EB' }}>
+                    <option value="">Selecionar…</option>
+                    {FAQ_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
               </div>
             </div>

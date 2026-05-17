@@ -10,6 +10,7 @@ const ALLOWED_TABLES = new Set([
   'user_copys',
   'quote_examples',
   'objection_patterns',
+  'whatsapp_templates',
 ])
 
 export async function POST(request: NextRequest) {

@@ -77,11 +77,11 @@ export async function POST(request: Request) {
     if (id) {
       const { error } = await admin.from('knowledge_base').update(record).eq('id', id)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      return NextResponse.json({ success: true, data: { id } })
+      return NextResponse.json({ success: true, data: { id, content } })
     } else {
       const { data, error } = await admin.from('knowledge_base').insert(record).select('id').single()
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      return NextResponse.json({ success: true, data })
+      return NextResponse.json({ success: true, data: { id: data.id, content } })
     }
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

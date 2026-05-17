@@ -43,8 +43,8 @@ export default function Header({ user, profile }: HeaderProps) {
   }
 
   return (
-    <header className="bg-white border-b border-[#E5E7EB] px-6 h-14 flex items-center justify-between flex-shrink-0">
-      <h1 className="text-[15px] font-semibold text-[#111827]">{title}</h1>
+    <header className="bg-white border-b border-[#E5E7EB] px-4 lg:px-6 h-14 flex items-center justify-between flex-shrink-0 min-w-0">
+      <h1 className="text-[15px] font-semibold text-[#111827] truncate">{title}</h1>
 
       <div className="flex items-center gap-3">
         {displayName && (

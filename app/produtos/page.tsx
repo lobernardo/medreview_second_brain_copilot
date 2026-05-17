@@ -151,12 +151,13 @@ export default function ProdutosPage() {
       if (!res.ok) throw new Error(json.error)
 
       const savedId = editingProduct?.id ?? json.data.id
+      const savedContent = json.data.content
 
       // trigger embedding async
       fetch('/api/embeddings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table: 'knowledge_base', id: savedId, content: form.main_pitch || form.description || form.nome }),
+        body: JSON.stringify({ table: 'knowledge_base', id: savedId, content: savedContent }),
       }).catch(() => {})
 
       // refresh list

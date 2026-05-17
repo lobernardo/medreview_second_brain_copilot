@@ -71,7 +71,11 @@ SOBRE A MED-REVIEW:
 
 ${trailSection}${currentSection}${nextSection}
 
-${customInstructions ? `INSTRUÇÕES DO GESTOR:\n${customInstructions}\n` : ''}CONTEXTO DA BASE DE CONHECIMENTO:
+${customInstructions ? `INSTRUÇÕES DO GESTOR:\n${customInstructions}\n` : ''}SOBRE O CONTEXTO RECEBIDO:
+- FAQs exibem um score de relevância. Se houver FAQ com relevância acima de 80%, use essa resposta como base — ela foi validada pelo time.
+- Não invente informações que não estejam no contexto abaixo.
+
+CONTEXTO DA BASE DE CONHECIMENTO:
 ${context || '(sem contexto disponível — responda com base nas informações acima)'}`.trim()
 }
 

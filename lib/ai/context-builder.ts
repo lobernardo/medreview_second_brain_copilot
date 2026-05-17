@@ -23,18 +23,36 @@ function getServiceClient() {
   return createClient(url, key)
 }
 
-function truncate(text: string, maxChars = 12000): string {
-  return text.length > maxChars ? text.slice(0, maxChars) + '…' : text
+function truncate(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text
+  const cut = text.lastIndexOf('.', maxChars)
+  return cut > maxChars * 0.8 ? text.slice(0, cut + 1) : text.slice(0, maxChars) + '…'
+}
+
+const VERTICAL_KEYWORDS: Record<string, string[]> = {
+  Anest: ['anest', 'anestesiologia', 'tea'],
+  Oft:   ['oft', 'oftalmologia', 'cbo'],
+  Ortop: ['ortop', 'ortopedia', 'taro'],
+  R1:    ['r1', 'residência', 'residencia', 'revalida'],
+}
+
+function detectVertical(text: string): string | null {
+  const lower = text.toLowerCase()
+  for (const [vertical, keywords] of Object.entries(VERTICAL_KEYWORDS)) {
+    if (keywords.some((kw) => lower.includes(kw))) return vertical
+  }
+  return null
 }
 
 type SupabaseClient = ReturnType<typeof getServiceClient>
 
-async function matchKb(supabase: SupabaseClient, embedding: number[], parts: string[], sources: ContextSource[]) {
+async function matchKb(supabase: SupabaseClient, embedding: number[], parts: string[], sources: ContextSource[], vertical: string | null) {
   try {
     const { data } = await supabase.rpc('match_knowledge_base', {
       query_embedding: embedding,
       match_count: 5,
       match_threshold: 0.5,
+      filter_vertical: vertical,
     })
     if (data?.length) {
       const text = data
@@ -43,53 +61,85 @@ async function matchKb(supabase: SupabaseClient, embedding: number[], parts: str
       parts.push(`## Base de Conhecimento\n\n${text}`)
       data.forEach((d: any) => sources.push({ id: d.id, title: d.title, similarity: d.similarity ?? 0 }))
     }
-  } catch { /* RPC not available yet */ }
+  } catch (err) {
+    console.error('[RAG] match_knowledge_base failed:', err)
+  }
 }
 
-async function matchFaq(supabase: SupabaseClient, embedding: number[], parts: string[], sources: ContextSource[]) {
+async function matchFaq(supabase: SupabaseClient, embedding: number[], parts: string[], sources: ContextSource[], vertical: string | null) {
   try {
     const { data } = await supabase.rpc('match_faq', {
       query_embedding: embedding,
       match_count: 3,
       match_threshold: 0.5,
+      filter_vertical: vertical,
     })
     if (data?.length) {
-      const text = data.map((d: any) => `**Q:** ${d.question}\n**A:** ${d.answer}`).join('\n\n')
+      const text = data.map((d: any) => {
+        const score = ((d.similarity ?? 0) * 100).toFixed(0)
+        return `**Q:** ${d.question} [relevância: ${score}%]\n**A:** ${d.answer}`
+      }).join('\n\n')
       parts.push(`## FAQ\n\n${text}`)
       data.forEach((d: any) =>
         sources.push({ id: d.id, title: d.question.slice(0, 60), similarity: d.similarity ?? 0 })
       )
     }
-  } catch { /* RPC not available yet */ }
+  } catch (err) {
+    console.error('[RAG] match_faq failed:', err)
+  }
 }
 
-async function matchObjections(supabase: SupabaseClient, embedding: number[], parts: string[]) {
+async function matchObjections(
+  supabase: SupabaseClient,
+  embedding: number[],
+  parts: string[],
+  userId?: string,
+  vertical?: string | null
+) {
   try {
     const { data } = await supabase.rpc('match_objections', {
       query_embedding: embedding,
       match_count: 4,
       match_threshold: 0.45,
+      filter_vertical: vertical ?? null,
     })
-    if (data?.length) {
-      const text = data
-        .map(
-          (o: any) =>
-            `**${o.topic}** (win rate: ${o.win_rate ?? '?'}%)\n` +
-            `Significado real: ${o.real_meaning ?? '-'}\n` +
-            `Resposta: ${o.recommended_response ?? '-'}\n` +
-            `Não dizer: ${o.what_not_to_say ?? '-'}`
-        )
-        .join('\n\n')
-      parts.push(`## Matriz de Objeções\n\n${text}`)
+    if (!data?.length) return
+
+    let personalResponses: Record<string, string> = {}
+    if (userId) {
+      const ids = data.map((o: any) => o.id)
+      const { data: userResps } = await supabase
+        .from('user_objection_responses')
+        .select('objection_id, response_text')
+        .eq('user_id', userId)
+        .in('objection_id', ids)
+      if (userResps?.length) {
+        personalResponses = Object.fromEntries(userResps.map((r: any) => [r.objection_id, r.response_text]))
+      }
     }
-  } catch { /* RPC not available yet */ }
+
+    const text = data
+      .map(
+        (o: any) =>
+          `**${o.topic}** (win rate: ${o.win_rate ?? '?'}%)\n` +
+          `Significado real: ${o.real_meaning ?? '-'}\n` +
+          `Resposta recomendada: ${o.recommended_response ?? '-'}\n` +
+          (personalResponses[o.id] ? `Resposta pessoal do closer: ${personalResponses[o.id]}\n` : '') +
+          `Não dizer: ${o.what_not_to_say ?? '-'}`
+      )
+      .join('\n\n')
+    parts.push(`## Matriz de Objeções\n\n${text}`)
+  } catch (err) {
+    console.error('[RAG] match_objections failed:', err)
+  }
 }
 
 async function matchCopys(
   supabase: SupabaseClient,
   embedding: number[],
   userId: string | undefined,
-  parts: string[]
+  parts: string[],
+  vertical: string | null
 ) {
   try {
     const { data } = await supabase.rpc('match_copys', {
@@ -97,6 +147,7 @@ async function matchCopys(
       match_count: 4,
       match_threshold: 0.45,
       filter_user_id: userId ?? null,
+      filter_vertical: vertical,
     })
     if (data?.length) {
       const text = data
@@ -108,15 +159,18 @@ async function matchCopys(
         .join('\n\n')
       parts.push(`## Copys do Time\n\n${text}`)
     }
-  } catch { /* RPC not available yet */ }
+  } catch (err) {
+    console.error('[RAG] match_copys failed:', err)
+  }
 }
 
-async function matchQuotes(supabase: SupabaseClient, embedding: number[], parts: string[]) {
+async function matchQuotes(supabase: SupabaseClient, embedding: number[], parts: string[], vertical: string | null) {
   try {
     const { data } = await supabase.rpc('match_quotes', {
       query_embedding: embedding,
       match_count: 3,
       match_threshold: 0.4,
+      filter_vertical: vertical,
     })
     if (data?.length) {
       const text = data
@@ -127,7 +181,9 @@ async function matchQuotes(supabase: SupabaseClient, embedding: number[], parts:
         .join('\n\n---\n\n')
       parts.push(`## Orçamentos que Converteram\n\n${text}`)
     }
-  } catch { /* RPC not available yet */ }
+  } catch (err) {
+    console.error('[RAG] match_quotes failed:', err)
+  }
 }
 
 function fmtCtxDate(dateStr: string): string {
@@ -165,7 +221,8 @@ async function fetchExamDates(supabase: SupabaseClient): Promise<string> {
     })
 
     return `DATAS DE PROVAS:\n${lines.join('\n')}`
-  } catch {
+  } catch (err) {
+    console.error('[RAG] fetchExamDates failed:', err)
     return ''
   }
 }
@@ -197,7 +254,8 @@ async function fetchUpcomingEvents(supabase: SupabaseClient): Promise<string> {
     })
 
     return `EVENTOS PRÓXIMOS (30 dias):\n${lines.join('\n')}`
-  } catch {
+  } catch (err) {
+    console.error('[RAG] fetchUpcomingEvents failed:', err)
     return ''
   }
 }
@@ -235,7 +293,8 @@ async function fetchVerdadeiroValor(supabase: SupabaseClient): Promise<string> {
     }
 
     return lines.join('\n\n')
-  } catch {
+  } catch (err) {
+    console.error('[RAG] fetchVerdadeiroValor failed:', err)
     return ''
   }
 }
@@ -248,7 +307,8 @@ async function fetchUserProfile(supabase: SupabaseClient, userId: string): Promi
       .eq('id', userId)
       .single()
     return data ?? null
-  } catch {
+  } catch (err) {
+    console.error('[RAG] fetchUserProfile failed:', err)
     return null
   }
 }
@@ -273,8 +333,13 @@ async function fallbackTextSearch(
         }
       })
     }
-  } catch { /* table not available yet */ }
+  } catch (err) {
+    console.error('[RAG] fallbackTextSearch failed:', err)
+  }
 }
+
+const MAX_RAG_CHARS   = 8000
+const MAX_FIXED_CHARS = 4000
 
 export async function buildContext(
   message: string,
@@ -282,7 +347,8 @@ export async function buildContext(
   userId?: string
 ): Promise<BuiltContext> {
   const supabase = getServiceClient()
-  const parts: string[] = []
+  const ragParts:   string[] = []
+  const fixedParts: string[] = []
   const sources: ContextSource[] = []
 
   const [vvBlock, examBlock, eventBlock, embedding, profile] = await Promise.all([
@@ -293,29 +359,40 @@ export async function buildContext(
     userId ? fetchUserProfile(supabase, userId) : Promise.resolve(null),
   ])
 
-  if (vvBlock) parts.push(vvBlock)
-  if (examBlock) parts.push(examBlock)
-  if (eventBlock) parts.push(eventBlock)
+  const vertical =
+    detectVertical(message) ||
+    (profile?.vertical_focus ? profile.vertical_focus.split(',')[0].trim() : null)
+
+  if (vvBlock)    fixedParts.push(vvBlock)
+  if (examBlock)  fixedParts.push(examBlock)
+  if (eventBlock) fixedParts.push(eventBlock)
 
   if (!embedding) {
-    await fallbackTextSearch(supabase, message, parts, sources)
-    return { context: truncate(parts.join('\n\n---\n\n')), sources, profile }
+    await fallbackTextSearch(supabase, message, ragParts, sources)
+    const context = buildFinalContext(ragParts, fixedParts)
+    return { context, sources, profile }
   }
 
   const calls: Promise<void>[] = [
-    matchKb(supabase, embedding, parts, sources),
-    matchFaq(supabase, embedding, parts, sources),
+    matchKb(supabase, embedding, ragParts, sources, vertical),
+    matchFaq(supabase, embedding, ragParts, sources, vertical),
   ]
 
-  if (mode === 'objeção') calls.push(matchObjections(supabase, embedding, parts))
-  if (['follow-up', 'proposta', 'copys'].includes(mode)) calls.push(matchCopys(supabase, embedding, userId, parts))
-  if (mode === 'proposta') calls.push(matchQuotes(supabase, embedding, parts))
+  if (mode === 'objeção') calls.push(matchObjections(supabase, embedding, ragParts, userId, vertical))
+  if (['follow-up', 'proposta', 'copys'].includes(mode)) calls.push(matchCopys(supabase, embedding, userId, ragParts, vertical))
+  if (mode === 'proposta') calls.push(matchQuotes(supabase, embedding, ragParts, vertical))
 
   await Promise.all(calls)
 
   if (sources.length < 2) {
-    await fallbackTextSearch(supabase, message, parts, sources)
+    await fallbackTextSearch(supabase, message, ragParts, sources)
   }
 
-  return { context: truncate(parts.join('\n\n---\n\n')), sources, profile }
+  return { context: buildFinalContext(ragParts, fixedParts), sources, profile }
+}
+
+function buildFinalContext(ragParts: string[], fixedParts: string[]): string {
+  const rag   = ragParts.length   ? truncate(ragParts.join('\n\n---\n\n'),   MAX_RAG_CHARS)   : ''
+  const fixed = fixedParts.length ? truncate(fixedParts.join('\n\n---\n\n'), MAX_FIXED_CHARS) : ''
+  return [rag, fixed].filter(Boolean).join('\n\n---\n\n')
 }

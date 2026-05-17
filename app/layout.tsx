@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -8,6 +8,11 @@ import type { Profile } from '@/lib/utils/types'
 export const metadata: Metadata = {
   title: 'Med-Review Second Brain',
   description: 'Sistema interno de inteligência comercial',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 }
 
 export default async function RootLayout({

@@ -56,6 +56,8 @@ button, [role="button"], a {
 html,
 body {
   height: 100%;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 body {
@@ -66,4 +68,38 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prevent media from overflowing their containers */
+img, video, iframe, embed, object {
+  max-width: 100%;
+}
+
+/* Markdown / prose overflow fixes */
+.prose {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+
+.prose pre {
+  overflow-x: auto;
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.prose code {
+  word-break: break-all;
+}
+
+.prose table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.prose img {
+  max-width: 100%;
+  height: auto;
 }

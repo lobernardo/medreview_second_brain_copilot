@@ -15,15 +15,16 @@ import { Toast } from '@/components/ui/toast'
 import { useProfile } from '@/lib/context/profile-context'
 
 const KB_CATEGORIES = [
-  { value: 'produto',           label: 'Produto',             color: '#3B82F6', bg: '#EFF6FF' },
-  { value: 'playbook',          label: 'Playbook',            color: '#8B5CF6', bg: '#F5F3FF' },
-  { value: 'objeção-resposta',  label: 'Objeção & Resposta',  color: '#F59E0B', bg: '#FFFBEB' },
-  { value: 'regra-comercial',   label: 'Regra Comercial',     color: '#6366F1', bg: '#EEF2FF' },
-  { value: 'diferencial',       label: 'Diferencial',         color: '#10B981', bg: '#ECFDF5' },
-  { value: 'faq',               label: 'FAQ',                 color: '#06B6D4', bg: '#ECFEFF' },
-  { value: 'template-followup', label: 'Template Follow-up',  color: '#F97316', bg: '#FFF7ED' },
-  { value: 'case-sucesso',      label: 'Case de Sucesso',     color: '#EC4899', bg: '#FDF2F8' },
-  { value: 'script-copy',       label: 'Script / Copy',       color: '#6B7280', bg: '#F3F4F6' },
+  { value: 'produto',            label: 'Produto',              color: '#3B82F6', bg: '#EFF6FF' },
+  { value: 'playbook',           label: 'Playbook',             color: '#8B5CF6', bg: '#F5F3FF' },
+  { value: 'tecnica-comercial',  label: 'Técnica Comercial',    color: '#D97706', bg: '#FEF3C7' },
+  { value: 'objeção-resposta',   label: 'Objeção & Resposta',   color: '#F59E0B', bg: '#FFFBEB' },
+  { value: 'regra-comercial',    label: 'Regra Comercial',      color: '#6366F1', bg: '#EEF2FF' },
+  { value: 'diferencial',        label: 'Diferencial',          color: '#10B981', bg: '#ECFDF5' },
+  { value: 'faq',                label: 'FAQ',                  color: '#06B6D4', bg: '#ECFEFF' },
+  { value: 'template-followup',  label: 'Template Follow-up',   color: '#F97316', bg: '#FFF7ED' },
+  { value: 'case-sucesso',       label: 'Case de Sucesso',      color: '#EC4899', bg: '#FDF2F8' },
+  { value: 'script-copy',        label: 'Script / Copy',        color: '#6B7280', bg: '#F3F4F6' },
 ]
 
 const MEDIA_ACCEPT = '.mp3,.m4a,.wav,.webm,.mpga,.mp4,.mpeg'
