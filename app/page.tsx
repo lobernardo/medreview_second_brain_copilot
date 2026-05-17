@@ -215,22 +215,18 @@ export default function HomePage() {
       </div>
 
       {/* ── Insight do Dia ── */}
-      {loaded && tip && (() => {
-        const stripped = tip.content.replace(/[#*`_~[\]|>]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').trim()
-        const preview = stripped.length > 200 ? stripped.slice(0, 200).trimEnd() + '…' : stripped
-        return (
-          <div className="bg-white border border-[#E5E7EB] rounded-2xl p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#FEF3C7' }}>
-                <Lightbulb size={14} style={{ color: '#D97706' }} strokeWidth={2} />
-              </div>
-              <span className="text-sm font-semibold text-[#111827]">Insight do Dia</span>
+      {loaded && tip && (
+        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#FEF3C7' }}>
+              <Lightbulb size={14} style={{ color: '#D97706' }} strokeWidth={2} />
             </div>
-            <p className="text-xs font-semibold text-[#6366F1] mb-1 uppercase tracking-wide">{tip.title}</p>
-            <p className="text-sm text-[#374151] leading-relaxed">{preview}</p>
+            <span className="text-sm font-semibold text-[#111827]">Insight do Dia</span>
           </div>
-        )
-      })()}
+          <p className="text-[11px] text-[#9CA3AF] mb-1.5 font-medium truncate">{tip.title}</p>
+          <p className="text-sm text-[#374151] leading-relaxed">{tip.content}</p>
+        </div>
+      )}
 
       {/* ── Alertas Comerciais ── */}
       {loaded && alerts.length > 0 && (
