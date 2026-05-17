@@ -58,12 +58,12 @@ export async function GET() {
 
     const tip = await generateTip(doc.title, doc.content)
 
-    admin
-      .from('knowledge_base')
-      .update({ cached_tip: tip, cached_tip_date: todayStr })
-      .eq('id', doc.id)
-      .then(() => {})
-      .catch((err: unknown) => console.error('[dica-do-dia] cache update failed:', err))
+    Promise.resolve(
+      admin
+        .from('knowledge_base')
+        .update({ cached_tip: tip, cached_tip_date: todayStr })
+        .eq('id', doc.id)
+    ).catch((err: unknown) => console.error('[dica-do-dia] cache update failed:', err))
 
     return NextResponse.json({ data: { id: doc.id, title: doc.title, content: tip } })
   } catch (err) {
