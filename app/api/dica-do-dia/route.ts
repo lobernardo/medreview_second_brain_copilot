@@ -12,7 +12,7 @@ export async function GET() {
     const { data, error } = await admin
       .from('knowledge_base')
       .select('id, title, content')
-      .eq('category', 'tecnica-comercial')
+      .in('category', ['tecnica-comercial', 'playbook'])
       .eq('is_active', true)
       .order('id', { ascending: true })
 
