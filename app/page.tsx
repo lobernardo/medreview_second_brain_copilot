@@ -182,6 +182,12 @@ export default function HomePage() {
     [exams, role],
   )
 
+  // Next 5 upcoming exams (any distance)
+  const upcomingExams = useMemo(
+    () => exams.filter(e => daysUntil(e.exam_date) >= 0).slice(0, 5),
+    [exams],
+  )
+
   const quickActions = QUICK_ACTIONS[role]
 
   // ─── Render ─────────────────────────────────────────────────────────────────
@@ -256,6 +262,44 @@ export default function HomePage() {
                 >
                   <Icon size={14} className="flex-shrink-0 mt-0.5" style={{ color: s.color }} strokeWidth={2} />
                   <p className="text-xs leading-relaxed" style={{ color: s.color }}>{alert.message}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Próximas Provas ── */}
+      {loaded && upcomingExams.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-1.5">
+              <GraduationCap size={16} className="text-[#6366F1]" strokeWidth={1.5} />
+              <span className="text-sm font-semibold text-[#111827]">Próximas Provas</span>
+            </div>
+            <Link href="/agenda" className="flex items-center gap-1 text-xs text-[#6366F1] hover:text-[#4F46E5] transition-colors">
+              Ver agenda <ChevronRight size={12} />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {upcomingExams.map(exam => {
+              const days = daysUntil(exam.exam_date)
+              const countdownColor = days <= 30 ? '#EF4444' : days <= 60 ? '#F59E0B' : '#10B981'
+              const countdownBg   = days <= 30 ? '#FEF2F2' : days <= 60 ? '#FFFBEB' : '#ECFDF5'
+              return (
+                <div key={exam.id} className="bg-white border border-[#E5E7EB] rounded-xl p-3 flex items-center gap-3">
+                  <div className="flex-shrink-0 w-14 h-14 rounded-xl flex flex-col items-center justify-center"
+                    style={{ background: countdownBg }}>
+                    <span className="text-lg font-bold leading-none" style={{ color: countdownColor }}>{days}</span>
+                    <span className="text-[10px] font-medium mt-0.5" style={{ color: countdownColor }}>dias</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-[#111827] leading-snug truncate">{exam.name}</p>
+                    <p className="text-[11px] text-[#9CA3AF] mt-0.5">{fmtDate(exam.exam_date)}</p>
+                    <div className="mt-1">
+                      <VerticalBadge vertical={exam.vertical} />
+                    </div>
+                  </div>
                 </div>
               )
             })}
