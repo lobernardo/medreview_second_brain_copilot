@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   Bot, GraduationCap, NotebookPen, Mail, HelpCircle, BookOpen,
   MessageSquareText, Trophy, Package, Calendar, ChevronRight,
-  AlertTriangle, TrendingUp, Clock, Lightbulb, ChevronDown, ChevronUp,
+  AlertTriangle, TrendingUp, Clock, Lightbulb,
 } from 'lucide-react'
 import { VerticalBadge } from '@/components/ui/badge'
 import { useProfile } from '@/lib/context/profile-context'
@@ -154,7 +154,6 @@ export default function HomePage() {
   const [events, setEvents] = useState<CompanyEvent[]>([])
   const [loaded, setLoaded] = useState(false)
   const [tip, setTip] = useState<KbTip | null>(null)
-  const [tipExpanded, setTipExpanded] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -217,29 +216,18 @@ export default function HomePage() {
 
       {/* ── Insight do Dia ── */}
       {loaded && tip && (() => {
-        const stripped = tip.content.replace(/[#*`_~[\]|>]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\n{2,}/g, '\n').trim()
-        const preview = stripped.slice(0, 300)
-        const hasMore = stripped.length > 300
+        const stripped = tip.content.replace(/[#*`_~[\]|>]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').trim()
+        const preview = stripped.length > 200 ? stripped.slice(0, 200).trimEnd() + '…' : stripped
         return (
-          <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
+          <div className="bg-white border border-[#E5E7EB] rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#FEF3C7' }}>
                 <Lightbulb size={14} style={{ color: '#D97706' }} strokeWidth={2} />
               </div>
               <span className="text-sm font-semibold text-[#111827]">Insight do Dia</span>
             </div>
             <p className="text-xs font-semibold text-[#6366F1] mb-1 uppercase tracking-wide">{tip.title}</p>
-            <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-line">
-              {tipExpanded ? stripped : preview}{hasMore && !tipExpanded ? '…' : ''}
-            </p>
-            {hasMore && (
-              <button
-                onClick={() => setTipExpanded(v => !v)}
-                className="flex items-center gap-1 mt-2 text-xs font-medium text-[#6366F1] hover:text-[#4F46E5] transition-colors"
-              >
-                {tipExpanded ? <><ChevronUp size={12} /> Ver menos</> : <><ChevronDown size={12} /> Ver mais</>}
-              </button>
-            )}
+            <p className="text-sm text-[#374151] leading-relaxed">{preview}</p>
           </div>
         )
       })()}
