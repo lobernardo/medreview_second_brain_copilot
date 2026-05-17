@@ -33,7 +33,9 @@
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\leool\\\\projetos\\\\copilot-medreview\" | Where-Object { !$_.PSIsContainer } | Select-Object Name)",
       "Bash(Remove-Item *)",
       "Bash(Select-Object -Property Name, FullName)",
-      "Bash(git mv *)"
+      "Bash(git mv *)",
+      "Bash(curl *)",
+      "Bash(Start-Sleep -Seconds 70)"
     ]
   }
 }

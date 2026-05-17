@@ -30,9 +30,8 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const isLoginPage = request.nextUrl.pathname === '/login'
-  const isPublicApi = request.nextUrl.pathname === '/api/reembed-produtos'
 
-  if (!user && !isLoginPage && !isPublicApi) {
+  if (!user && !isLoginPage) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
