@@ -891,6 +891,16 @@ export default function KbPage() {
                   <button onClick={closeModal}
                     className="px-4 py-2 text-sm font-medium text-gray-600 border rounded-lg hover:bg-gray-50 transition-colors"
                     style={{ borderColor: '#E5E7EB' }}>Cancelar</button>
+                  {!editingDoc && (
+                    <button onClick={doSave} disabled={saving || transcribing}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-indigo-50 disabled:opacity-60"
+                      style={{ borderColor: '#6366F1', color: '#6366F1', background: 'white' }}>
+                      {saving
+                        ? <><Loader2 size={14} className="animate-spin" /> Salvando…</>
+                        : 'Salvar direto'
+                      }
+                    </button>
+                  )}
                   <button onClick={handleSave} disabled={saving || transcribing}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60"
                     style={{ background: '#6366F1' }}>
