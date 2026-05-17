@@ -5,7 +5,12 @@ import { generateEmbedding } from '@/lib/ai/embeddings'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-export async function POST() {
+const SECRET = 'reembed-medreview-2026'
+
+export async function POST(request: Request) {
+  const key = request.headers.get('x-reembed-secret')
+  if (key !== SECRET) return new Response('Forbidden', { status: 403 })
+
   try {
     const admin = createAdminClient()
 
