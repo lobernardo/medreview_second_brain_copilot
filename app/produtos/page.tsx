@@ -87,6 +87,14 @@ function extractDescription(content: string): string {
   return desc.length > 120 ? desc.slice(0, 120) + '…' : desc
 }
 
+function formatBRL(value: string): string {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return ''
+  const padded = digits.padStart(3, '0')
+  const intPart = (padded.slice(0, -2).replace(/^0+/, '') || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `R$ ${intPart},${padded.slice(-2)}`
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ProdutosPage() {
@@ -306,9 +314,10 @@ export default function ProdutosPage() {
                   </select>
                 </div>
                 <div>
+                  {/* TODO: integrar com API de preços quando disponível */}
                   <label className="block text-xs font-medium text-[#374151] mb-1">Preço de ref.</label>
-                  <input value={form.reference_price} onChange={e => setForm(f => ({ ...f, reference_price: e.target.value }))}
-                    placeholder="R$ 2.490"
+                  <input value={form.reference_price} onChange={e => setForm(f => ({ ...f, reference_price: formatBRL(e.target.value) }))}
+                    placeholder="R$ 2.490,00"
                     className="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                 </div>
               </div>
