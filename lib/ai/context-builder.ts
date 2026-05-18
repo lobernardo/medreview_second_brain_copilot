@@ -46,12 +46,12 @@ function detectVertical(text: string): string | null {
 
 type SupabaseClient = ReturnType<typeof getServiceClient>
 
-async function matchKb(supabase: SupabaseClient, embedding: number[], parts: string[], sources: ContextSource[], vertical: string | null) {
+async function matchKb(supabase: SupabaseClient, embedding: number[], parts: string[], sources: ContextSource[], vertical: string | null): Promise<boolean> {
   try {
     const { data } = await supabase.rpc('match_knowledge_base', {
       query_embedding: embedding,
       match_count: 5,
-      match_threshold: 0.5,
+      match_threshold: 0.45,
       filter_vertical: vertical,
     })
     if (data?.length) {
@@ -60,9 +60,12 @@ async function matchKb(supabase: SupabaseClient, embedding: number[], parts: str
         .join('\n\n')
       parts.push(`## Base de Conhecimento\n\n${text}`)
       data.forEach((d: any) => sources.push({ id: d.id, title: d.title, similarity: d.similarity ?? 0 }))
+      return true
     }
+    return false
   } catch (err) {
     console.error('[RAG] match_knowledge_base failed:', err)
+    return false
   }
 }
 
@@ -373,18 +376,18 @@ export async function buildContext(
     return { context, sources, profile }
   }
 
-  const calls: Promise<void>[] = [
+  const extraCalls: Promise<void>[] = []
+  if (mode === 'objeção') extraCalls.push(matchObjections(supabase, embedding, ragParts, userId, vertical))
+  if (['follow-up', 'proposta', 'copys'].includes(mode)) extraCalls.push(matchCopys(supabase, embedding, userId, ragParts, vertical))
+  if (mode === 'proposta') extraCalls.push(matchQuotes(supabase, embedding, ragParts, vertical))
+
+  const [kbFound] = await Promise.all([
     matchKb(supabase, embedding, ragParts, sources, vertical),
     matchFaq(supabase, embedding, ragParts, sources, vertical),
-  ]
+    ...extraCalls,
+  ])
 
-  if (mode === 'objeção') calls.push(matchObjections(supabase, embedding, ragParts, userId, vertical))
-  if (['follow-up', 'proposta', 'copys'].includes(mode)) calls.push(matchCopys(supabase, embedding, userId, ragParts, vertical))
-  if (mode === 'proposta') calls.push(matchQuotes(supabase, embedding, ragParts, vertical))
-
-  await Promise.all(calls)
-
-  if (sources.length < 2) {
+  if (sources.length < 2 || !kbFound) {
     await fallbackTextSearch(supabase, message, ragParts, sources)
   }
 
