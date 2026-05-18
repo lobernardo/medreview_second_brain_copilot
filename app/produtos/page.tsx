@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Edit2, Trash2, X, Loader2, Package, ChevronDown, ChevronUp } from 'lucide-react'
+import { Edit2, Trash2, X, Loader2, Package } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { VerticalBadge } from '@/components/ui/badge'
@@ -136,7 +136,6 @@ export default function ProdutosPage() {
   }, [products, filterVertical, filterStatus])
 
   // ── Handlers ──
-  function openNew() { setEditingProduct(null); setForm(EMPTY_FORM); setModal('form') }
   function openEdit(p: Product) {
     setEditingProduct(p)
     setForm({ ...EMPTY_FORM, ...parseProductContent(p.content), vertical: p.vertical ?? '' })
@@ -213,12 +212,6 @@ export default function ProdutosPage() {
             <option value="inativo">Inativo</option>
             <option value="beta">Beta</option>
           </select>
-          {isGestor && (
-            <button onClick={openNew}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#6366F1] hover:bg-[#4F46E5] text-white text-sm font-medium rounded-lg transition-colors">
-              <Plus size={15} /> Novo produto
-            </button>
-          )}
         </div>
       </div>
 
@@ -228,7 +221,7 @@ export default function ProdutosPage() {
       ) : filtered.length === 0 ? (
         <div className="bg-white border border-[#E5E7EB] rounded-xl p-10 text-center text-[#9CA3AF] text-sm">
           {products.length === 0
-            ? isGestor ? 'Nenhum produto cadastrado. Clique em "+ Novo produto" para começar.' : 'Nenhum produto cadastrado ainda.'
+            ? 'Nenhum produto cadastrado ainda.'
             : 'Nenhum resultado para os filtros selecionados.'}
         </div>
       ) : (
@@ -391,7 +384,7 @@ export default function ProdutosPage() {
               <button onClick={handleSave} disabled={saving || !form.nome.trim()}
                 className="flex items-center gap-2 px-4 py-2 bg-[#6366F1] hover:bg-[#4F46E5] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
                 {saving && <Loader2 size={14} className="animate-spin" />}
-                {editingProduct ? 'Salvar alterações' : 'Adicionar produto'}
+                Salvar alterações
               </button>
               <button onClick={closeModal} className="px-4 py-2 text-sm text-[#6B7280] hover:text-[#111827] border border-[#E5E7EB] rounded-lg transition-colors">Cancelar</button>
             </div>

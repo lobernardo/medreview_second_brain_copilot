@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
-import { Plus, Trash2, GripVertical, Save, CheckCircle, AlertCircle, Loader2, X, Clock } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, Trash2, GripVertical, Save, CheckCircle, AlertCircle, Loader2, X, Clock, UserCheck, UserX } from 'lucide-react'
 import { SkeletonForm } from '@/components/ui/skeleton'
 import type { TrailItem } from '@/lib/ai/onboarding-prompt'
 
@@ -106,17 +105,16 @@ interface FormState {
   tone: string
 }
 
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
-
-function useSupabase() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+interface UserRecord {
+  id: string
+  name: string
+  email: string
+  role: string
 }
 
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
+
 export default function OnboardingConfigPage() {
-  const supabase = useSupabase()
   const [configId, setConfigId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>({
     trail: [],
@@ -127,21 +125,34 @@ export default function OnboardingConfigPage() {
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
 
+  // ── Users for activation ───────────────────────────────────────────────────
+  const [users, setUsers] = useState<UserRecord[]>([])
+  const [usersLoading, setUsersLoading] = useState(true)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true)
+    try {
+      const res = await fetch('/api/usuarios')
+      const json = await res.json()
+      setUsers(json.data ?? [])
+    } catch { /* ignore */ } finally {
+      setUsersLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     async function load() {
       try {
-        const { data } = await supabase
-          .from('onboarding_config')
-          .select('id, trail, custom_instructions, welcome_message, tone')
-          .limit(1)
-          .maybeSingle()
-        if (data) {
-          setConfigId(data.id)
+        const res = await fetch('/api/onboarding-config')
+        const json = await res.json()
+        if (json.data) {
+          setConfigId(json.data.id)
           setForm({
-            trail: Array.isArray(data.trail) ? (data.trail as TrailItem[]) : [],
-            custom_instructions: data.custom_instructions ?? '',
-            welcome_message: data.welcome_message ?? '',
-            tone: data.tone ?? 'didático e acolhedor',
+            trail: Array.isArray(json.data.trail) ? (json.data.trail as TrailItem[]) : [],
+            custom_instructions: json.data.custom_instructions ?? '',
+            welcome_message: json.data.welcome_message ?? '',
+            tone: json.data.tone ?? 'didático e acolhedor',
           })
         }
       } catch { /* table not set up yet */ } finally {
@@ -149,7 +160,23 @@ export default function OnboardingConfigPage() {
       }
     }
     load()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    loadUsers()
+  }, [loadUsers])
+
+  async function toggleOnboarding(userId: string, currentRole: string) {
+    setTogglingId(userId)
+    try {
+      const newRole = currentRole === 'onboarding' ? 'closer' : 'onboarding'
+      const res = await fetch('/api/usuarios', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, role: newRole }),
+      })
+      if (res.ok) await loadUsers()
+    } catch { /* ignore */ } finally {
+      setTogglingId(null)
+    }
+  }
 
   function addTopic() {
     setForm((prev) => ({
@@ -270,24 +297,16 @@ export default function OnboardingConfigPage() {
         custom_instructions: form.custom_instructions || null,
         welcome_message: form.welcome_message || null,
         tone: form.tone,
-        updated_at: new Date().toISOString(),
       }
 
-      if (configId) {
-        const { error } = await supabase
-          .from('onboarding_config')
-          .update(payload)
-          .eq('id', configId)
-        if (error) throw error
-      } else {
-        const { data, error } = await supabase
-          .from('onboarding_config')
-          .insert(payload)
-          .select('id')
-          .single()
-        if (error) throw error
-        setConfigId(data.id)
-      }
+      const res = await fetch('/api/onboarding-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(configId ? { id: configId, ...payload } : payload),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      if (!configId && json.data?.id) setConfigId(json.data.id)
 
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 3000)
@@ -305,6 +324,9 @@ export default function OnboardingConfigPage() {
       </div>
     )
   }
+
+  const closers = users.filter(u => u.role === 'closer')
+  const onboardingUsers = users.filter(u => u.role === 'onboarding')
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
@@ -589,7 +611,7 @@ export default function OnboardingConfigPage() {
       </section>
 
       {/* Save button */}
-      <div className="flex items-center justify-between pb-8">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {saveStatus === 'saved' && (
             <div className="flex items-center gap-1.5 text-emerald-600 text-sm">
@@ -624,6 +646,80 @@ export default function OnboardingConfigPage() {
           )}
         </button>
       </div>
+
+      {/* ── Ativar Onboarding por Colaborador ─────────────────────────────────── */}
+      <section
+        className="bg-white rounded-xl border p-6 space-y-4"
+        style={{ borderColor: '#E5E7EB', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+      >
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">Ativar Onboarding por Colaborador</h2>
+          <p className="text-[12px] text-gray-500 mt-0.5">
+            Ative o modo onboarding para um colaborador. Enquanto ativo, ele acessa o Copilot Onboarding em vez do Copilot Vendas.
+          </p>
+        </div>
+
+        {usersLoading ? (
+          <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
+            <Loader2 size={14} className="animate-spin" />
+            Carregando colaboradores…
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Em onboarding */}
+            {onboardingUsers.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Em onboarding agora</p>
+                {onboardingUsers.map(u => (
+                  <div key={u.id} className="flex items-center justify-between py-2.5 px-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{u.name || '—'}</p>
+                      <p className="text-[12px] text-gray-500">{u.email}</p>
+                    </div>
+                    <button
+                      onClick={() => toggleOnboarding(u.id, u.role)}
+                      disabled={togglingId === u.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-red-600 hover:text-red-700 border border-red-200 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {togglingId === u.id ? <Loader2 size={12} className="animate-spin" /> : <UserX size={12} />}
+                      Concluir / Reverter
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Closers disponíveis */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                Closers disponíveis para onboarding
+              </p>
+              {closers.length === 0 ? (
+                <p className="text-sm text-gray-400 py-2">Nenhum closer cadastrado.</p>
+              ) : (
+                closers.map(u => (
+                  <div key={u.id} className="flex items-center justify-between py-2.5 px-3 border border-[#E5E7EB] rounded-lg hover:bg-gray-50 transition-colors">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{u.name || '—'}</p>
+                      <p className="text-[12px] text-gray-500">{u.email}</p>
+                    </div>
+                    <button
+                      onClick={() => toggleOnboarding(u.id, u.role)}
+                      disabled={togglingId === u.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {togglingId === u.id ? <Loader2 size={12} className="animate-spin" /> : <UserCheck size={12} />}
+                      Ativar Onboarding
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <div className="pb-8" />
     </div>
   )
 }
