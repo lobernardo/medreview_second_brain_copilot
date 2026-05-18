@@ -341,6 +341,72 @@ async function fallbackTextSearch(
   }
 }
 
+const STOP_WORDS = new Set([
+  'com', 'por', 'uma', 'um', 'que', 'para', 'sobre', 'falar', 'gerar', 'mais',
+  'como', 'seu', 'sua', 'dos', 'das', 'nos', 'nas', 'num', 'numa', 'este',
+  'essa', 'esse', 'isto', 'isso', 'aqui', 'ali', 'quando', 'onde', 'qual',
+  'quem', 'copy', 'copys', 'texto', 'fazer', 'quero', 'pedir', 'dizer', 'ver',
+  'pode', 'preciso', 'favor', 'obrigado', 'boa', 'bom', 'certo',
+])
+
+async function matchProductsByKeyword(
+  supabase: SupabaseClient,
+  message: string,
+  parts: string[],
+  sources: ContextSource[],
+  vertical: string | null
+) {
+  try {
+    const keywords = message
+      .toLowerCase()
+      .replace(/[^\w\sáéíóúãõâêôàü]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 4 && !STOP_WORDS.has(w))
+
+    if (!keywords.length) return
+
+    const orConditions = keywords.map(w => `title.ilike.%${w}%`).join(',')
+
+    let query = supabase
+      .from('knowledge_base')
+      .select('id, title, content, vertical')
+      .eq('category', 'produto')
+      .eq('is_active', true)
+      .or(orConditions)
+      .limit(2)
+
+    if (vertical) {
+      query = query.or(`vertical.eq.${vertical},vertical.is.null,vertical.eq.Geral`)
+    }
+
+    const { data } = await query
+    if (!data?.length) return
+
+    const newDocs = data.filter((d: any) => !sources.some(s => s.id === d.id))
+    if (!newDocs.length) return
+
+    const text = newDocs
+      .map((d: any) => `### ${d.title}${d.vertical ? ` (${d.vertical})` : ''}\n${d.content}`)
+      .join('\n\n')
+
+    const kbIdx = parts.findIndex(p => p.startsWith('## Base de Conhecimento'))
+    if (kbIdx !== -1) {
+      parts[kbIdx] = parts[kbIdx] + '\n\n' + text
+    } else {
+      parts.push(`## Base de Conhecimento\n\n${text}`)
+    }
+
+    newDocs.forEach((d: any) => {
+      if (!sources.some(s => s.id === d.id)) {
+        sources.push({ id: d.id, title: d.title, similarity: 0 })
+      }
+    })
+    console.log(`[RAG] matchProductsByKeyword: found ${newDocs.length} product(s) via keyword`)
+  } catch (err) {
+    console.error('[RAG] matchProductsByKeyword failed:', err)
+  }
+}
+
 const MAX_RAG_CHARS   = 8000
 const MAX_FIXED_CHARS = 4000
 
@@ -389,6 +455,11 @@ export async function buildContext(
 
   if (sources.length < 2 || !kbFound) {
     await fallbackTextSearch(supabase, message, ragParts, sources)
+  }
+
+  // Para modo produto: busca direta por keyword no título caso o produto não tenha sido encontrado pelo vetor
+  if (mode === 'produto') {
+    await matchProductsByKeyword(supabase, message, ragParts, sources, vertical)
   }
 
   return { context: buildFinalContext(ragParts, fixedParts), sources, profile }
