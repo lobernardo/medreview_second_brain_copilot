@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+async function requireAuth() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized', status: 401 as const }
+  return { error: null, status: 200 as const }
+}
+
 async function requireGestor() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -14,7 +21,7 @@ async function requireGestor() {
 
 export async function GET() {
   try {
-    const { error, status } = await requireGestor()
+    const { error, status } = await requireAuth()
     if (error) return NextResponse.json({ error }, { status })
 
     const admin = createAdminClient()

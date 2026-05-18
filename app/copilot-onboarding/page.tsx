@@ -50,25 +50,18 @@ function useOnboardingConfig() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
     async function load() {
       try {
-        const { data } = await supabase
-          .from('onboarding_config')
-          .select('trail, custom_instructions, welcome_message, tone, max_complexity, focus_verticals')
-          .limit(1)
-          .maybeSingle()
-        if (data) {
+        const res = await fetch('/api/onboarding-config')
+        const json = await res.json()
+        if (json.data) {
           setConfig({
-            trail: Array.isArray(data.trail) ? (data.trail as TrailItem[]) : [],
-            custom_instructions: data.custom_instructions ?? null,
-            welcome_message: data.welcome_message ?? null,
-            tone: data.tone ?? null,
-            max_complexity: data.max_complexity ?? null,
-            focus_verticals: data.focus_verticals ?? null,
+            trail: Array.isArray(json.data.trail) ? (json.data.trail as TrailItem[]) : [],
+            custom_instructions: json.data.custom_instructions ?? null,
+            welcome_message: json.data.welcome_message ?? null,
+            tone: json.data.tone ?? null,
+            max_complexity: json.data.max_complexity ?? null,
+            focus_verticals: json.data.focus_verticals ?? null,
           })
         }
       } catch { /* table not set up yet */ } finally {

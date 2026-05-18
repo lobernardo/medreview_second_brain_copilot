@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 import { buildContext } from '@/lib/ai/context-builder'
 import { buildOnboardingSystemPrompt, type OnboardingConfig } from '@/lib/ai/onboarding-prompt'
 import { callLLMStream } from '@/lib/ai/llm-client'
@@ -33,6 +34,10 @@ async function fetchOnboardingConfig(): Promise<OnboardingConfig | null> {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createServerClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const body = await request.json()
     const {
       message,
