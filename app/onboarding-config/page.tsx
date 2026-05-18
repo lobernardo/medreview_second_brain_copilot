@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Plus, Trash2, GripVertical, Save, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Save, CheckCircle, AlertCircle, Loader2, X, Clock } from 'lucide-react'
 import { SkeletonForm } from '@/components/ui/skeleton'
 import type { TrailItem } from '@/lib/ai/onboarding-prompt'
 
@@ -11,6 +11,92 @@ const TONE_OPTIONS = [
   { value: 'objetivo e direto', label: 'Objetivo e direto' },
   { value: 'descontraído e motivador', label: 'Descontraído e motivador' },
   { value: 'formal e profissional', label: 'Formal e profissional' },
+]
+
+const MATERIAL_TYPE_LABELS: Record<string, string> = {
+  video: 'Vídeo YouTube',
+  doc: 'Documento',
+  link: 'Link externo',
+}
+
+const DEFAULT_TRAIL: TrailItem[] = [
+  {
+    order: 1,
+    title: 'A Med-Review: Quem somos',
+    description: 'Missão, história, posicionamento e diferenciais da empresa. Verdadeiro Valor.',
+    estimated_minutes: 30,
+    materials: [],
+    quiz_questions: [
+      'Com suas palavras, qual é o principal diferencial da Med-Review em relação a outros preparatórios médicos?',
+      'Cite 3 big numbers da Med-Review que você usaria numa conversa com um lead.',
+    ],
+  },
+  {
+    order: 2,
+    title: 'As 4 Verticais',
+    description: 'R1, Anest-Review, Oft-Review, Ortop-Review: público-alvo, provas e posicionamento de cada uma.',
+    estimated_minutes: 45,
+    materials: [],
+    quiz_questions: [
+      'Quais provas a vertical Anest-Review prepara?',
+      'Qual a diferença entre o público de R1 e o público de Anest?',
+    ],
+  },
+  {
+    order: 3,
+    title: 'Produtos e Ofertas',
+    description: 'Catálogo completo de cada vertical: o que cada produto inclui, pra quem serve, quando indicar.',
+    estimated_minutes: 60,
+    materials: [],
+    quiz_questions: [
+      'Qual a diferença entre o Extensive Anest e o Anest-Pass Blue?',
+      'Para qual perfil de lead você indicaria o Anest-Pass Black?',
+    ],
+  },
+  {
+    order: 4,
+    title: 'ICP e Personas',
+    description: 'Quem são nossos clientes ideais por vertical. Como identificar o perfil do lead.',
+    estimated_minutes: 30,
+    materials: [],
+    quiz_questions: [
+      'Descreva o perfil ideal de um lead para a vertical de Anestesiologia.',
+      'Quais sinais indicam que um lead tem urgência real de compra?',
+    ],
+  },
+  {
+    order: 5,
+    title: 'Processo Comercial e Funil',
+    description: 'Etapas da venda: qualificação, diagnóstico, apresentação, negociação, fechamento. Ferramentas internas.',
+    estimated_minutes: 45,
+    materials: [],
+    quiz_questions: [
+      'Quais são as etapas do funil comercial da Med-Review?',
+      'O que o closer deve fazer ANTES de apresentar preço ao lead?',
+    ],
+  },
+  {
+    order: 6,
+    title: 'Objeções e Contorno',
+    description: 'As objeções mais comuns e como responder. Matriz de Objeções do sistema.',
+    estimated_minutes: 45,
+    materials: [],
+    quiz_questions: [
+      "Qual é a primeira coisa que você deve fazer quando o lead diz 'tá caro'?",
+      'Por que nunca devemos oferecer desconto como primeira resposta a uma objeção de preço?',
+    ],
+  },
+  {
+    order: 7,
+    title: 'Follow-up e WhatsApp',
+    description: 'Regras de follow-up, janela de 24h, templates aprovados pela Meta, boas práticas de WhatsApp comercial.',
+    estimated_minutes: 30,
+    materials: [],
+    quiz_questions: [
+      'O que acontece quando a janela de 24h do WhatsApp fecha?',
+      'Cite 2 boas práticas de comunicação comercial no WhatsApp.',
+    ],
+  },
 ]
 
 interface FormState {
@@ -70,7 +156,7 @@ export default function OnboardingConfigPage() {
       ...prev,
       trail: [
         ...prev.trail,
-        { order: prev.trail.length + 1, title: '', description: '' },
+        { order: prev.trail.length + 1, title: '', description: '', materials: [], quiz_questions: [] },
       ],
     }))
   }
@@ -84,12 +170,10 @@ export default function OnboardingConfigPage() {
     }))
   }
 
-  function updateTopic(index: number, field: keyof TrailItem, value: string) {
+  function updateTopicField(index: number, updates: Partial<TrailItem>) {
     setForm((prev) => ({
       ...prev,
-      trail: prev.trail.map((t, i) =>
-        i === index ? { ...t, [field]: value } : t
-      ),
+      trail: prev.trail.map((t, i) => i === index ? { ...t, ...updates } : t),
     }))
   }
 
@@ -101,6 +185,81 @@ export default function OnboardingConfigPage() {
       next.splice(to, 0, item)
       return { ...prev, trail: next.map((t, i) => ({ ...t, order: i + 1 })) }
     })
+  }
+
+  function addMaterial(topicIdx: number) {
+    setForm((prev) => ({
+      ...prev,
+      trail: prev.trail.map((t, i) =>
+        i === topicIdx
+          ? { ...t, materials: [...(t.materials ?? []), { type: 'link' as const, label: '', url: '' }] }
+          : t
+      ),
+    }))
+  }
+
+  function removeMaterial(topicIdx: number, matIdx: number) {
+    setForm((prev) => ({
+      ...prev,
+      trail: prev.trail.map((t, i) =>
+        i === topicIdx
+          ? { ...t, materials: (t.materials ?? []).filter((_, j) => j !== matIdx) }
+          : t
+      ),
+    }))
+  }
+
+  function updateMaterial(topicIdx: number, matIdx: number, field: 'type' | 'label' | 'url', value: string) {
+    setForm((prev) => ({
+      ...prev,
+      trail: prev.trail.map((t, i) =>
+        i === topicIdx
+          ? {
+              ...t,
+              materials: (t.materials ?? []).map((m, j) =>
+                j === matIdx ? { ...m, [field]: value } : m
+              ),
+            }
+          : t
+      ),
+    }))
+  }
+
+  function addQuizQuestion(topicIdx: number) {
+    setForm((prev) => ({
+      ...prev,
+      trail: prev.trail.map((t, i) =>
+        i === topicIdx
+          ? { ...t, quiz_questions: [...(t.quiz_questions ?? []), ''] }
+          : t
+      ),
+    }))
+  }
+
+  function removeQuizQuestion(topicIdx: number, qIdx: number) {
+    setForm((prev) => ({
+      ...prev,
+      trail: prev.trail.map((t, i) =>
+        i === topicIdx
+          ? { ...t, quiz_questions: (t.quiz_questions ?? []).filter((_, j) => j !== qIdx) }
+          : t
+      ),
+    }))
+  }
+
+  function updateQuizQuestion(topicIdx: number, qIdx: number, value: string) {
+    setForm((prev) => ({
+      ...prev,
+      trail: prev.trail.map((t, i) =>
+        i === topicIdx
+          ? { ...t, quiz_questions: (t.quiz_questions ?? []).map((q, j) => (j === qIdx ? value : q)) }
+          : t
+      ),
+    }))
+  }
+
+  function applyDefaultTrail() {
+    setForm((prev) => ({ ...prev, trail: DEFAULT_TRAIL }))
   }
 
   async function handleSave() {
@@ -179,9 +338,17 @@ export default function OnboardingConfigPage() {
         </div>
 
         {form.trail.length === 0 ? (
-          <div className="text-center py-10 text-gray-400 border border-dashed rounded-lg" style={{ borderColor: '#E5E7EB' }}>
-            <p className="text-sm">Nenhum tema adicionado ainda.</p>
-            <p className="text-[12px] mt-1">Clique em "Adicionar tema" para começar.</p>
+          <div className="text-center py-10 text-gray-400 border border-dashed rounded-lg space-y-3" style={{ borderColor: '#E5E7EB' }}>
+            <div>
+              <p className="text-sm">Nenhum tema adicionado ainda.</p>
+              <p className="text-[12px] mt-1">Clique em "Adicionar tema" para começar ou use a trilha padrão.</p>
+            </div>
+            <button
+              onClick={applyDefaultTrail}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 px-4 py-2 rounded-lg border border-indigo-200 hover:bg-indigo-50 transition-colors"
+            >
+              Usar trilha padrão (7 temas)
+            </button>
           </div>
         ) : (
           <div className="space-y-3">
@@ -192,6 +359,7 @@ export default function OnboardingConfigPage() {
                 style={{ borderColor: '#E5E7EB' }}
               >
                 <div className="flex items-start gap-3">
+                  {/* Move handle */}
                   <div className="flex flex-col gap-1 pt-1.5 flex-shrink-0">
                     <button
                       onClick={() => moveTopic(idx, idx - 1)}
@@ -203,7 +371,9 @@ export default function OnboardingConfigPage() {
                     </button>
                   </div>
 
-                  <div className="flex-1 space-y-2">
+                  {/* Content */}
+                  <div className="flex-1 space-y-3">
+                    {/* Title + estimated minutes */}
                     <div className="flex items-center gap-2">
                       <span
                         className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
@@ -214,21 +384,128 @@ export default function OnboardingConfigPage() {
                       <input
                         type="text"
                         value={topic.title}
-                        onChange={(e) => updateTopic(idx, 'title', e.target.value)}
+                        onChange={(e) => updateTopicField(idx, { title: e.target.value })}
                         placeholder="Título do tema…"
                         className="flex-1 text-sm font-medium text-gray-800 bg-transparent border-b border-transparent focus:border-indigo-300 outline-none pb-0.5 transition-colors placeholder-gray-400"
                       />
+                      <div className="flex items-center gap-1 flex-shrink-0 text-gray-400">
+                        <Clock size={12} />
+                        <input
+                          type="number"
+                          min={1}
+                          value={topic.estimated_minutes ?? ''}
+                          onChange={(e) =>
+                            updateTopicField(idx, {
+                              estimated_minutes: e.target.value ? Number(e.target.value) : undefined,
+                            })
+                          }
+                          placeholder="min"
+                          className="w-14 text-xs text-gray-600 bg-white border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-indigo-200 placeholder-gray-400"
+                          style={{ borderColor: '#E5E7EB' }}
+                        />
+                      </div>
                     </div>
+
+                    {/* Description */}
                     <textarea
                       value={topic.description ?? ''}
-                      onChange={(e) => updateTopic(idx, 'description', e.target.value)}
+                      onChange={(e) => updateTopicField(idx, { description: e.target.value })}
                       placeholder="Descrição opcional — o que o colaborador deve aprender neste tema…"
                       rows={2}
                       className="w-full text-[13px] text-gray-600 bg-white border rounded-lg px-3 py-2 outline-none resize-none focus:ring-2 focus:ring-indigo-200 transition-shadow placeholder-gray-400"
                       style={{ borderColor: '#E5E7EB' }}
                     />
+
+                    {/* Materials */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                          Materiais de apoio
+                        </span>
+                        <button
+                          onClick={() => addMaterial(idx)}
+                          className="flex items-center gap-1 text-[12px] text-indigo-600 hover:text-indigo-700 transition-colors"
+                        >
+                          <Plus size={12} />
+                          Adicionar material
+                        </button>
+                      </div>
+                      {(topic.materials ?? []).map((mat, matIdx) => (
+                        <div key={matIdx} className="flex items-center gap-2">
+                          <select
+                            value={mat.type}
+                            onChange={(e) => updateMaterial(idx, matIdx, 'type', e.target.value)}
+                            className="text-[12px] text-gray-600 bg-white border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-indigo-200 flex-shrink-0"
+                            style={{ borderColor: '#E5E7EB' }}
+                          >
+                            {Object.entries(MATERIAL_TYPE_LABELS).map(([val, label]) => (
+                              <option key={val} value={val}>{label}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            value={mat.label}
+                            onChange={(e) => updateMaterial(idx, matIdx, 'label', e.target.value)}
+                            placeholder="Nome do material…"
+                            className="flex-1 text-[12px] text-gray-700 bg-white border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-indigo-200 placeholder-gray-400"
+                            style={{ borderColor: '#E5E7EB' }}
+                          />
+                          <input
+                            type="url"
+                            value={mat.url}
+                            onChange={(e) => updateMaterial(idx, matIdx, 'url', e.target.value)}
+                            placeholder="https://…"
+                            className="flex-1 text-[12px] text-gray-700 bg-white border rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-indigo-200 placeholder-gray-400"
+                            style={{ borderColor: '#E5E7EB' }}
+                          />
+                          <button
+                            onClick={() => removeMaterial(idx, matIdx)}
+                            className="p-1 text-gray-300 hover:text-red-400 rounded transition-colors flex-shrink-0"
+                            title="Remover material"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Quiz questions */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                          Perguntas do quiz
+                        </span>
+                        <button
+                          onClick={() => addQuizQuestion(idx)}
+                          className="flex items-center gap-1 text-[12px] text-indigo-600 hover:text-indigo-700 transition-colors"
+                        >
+                          <Plus size={12} />
+                          Adicionar pergunta
+                        </button>
+                      </div>
+                      {(topic.quiz_questions ?? []).map((q, qIdx) => (
+                        <div key={qIdx} className="flex items-start gap-2">
+                          <textarea
+                            value={q}
+                            onChange={(e) => updateQuizQuestion(idx, qIdx, e.target.value)}
+                            placeholder="Pergunta que o Copilot vai fazer ao colaborador…"
+                            rows={2}
+                            className="flex-1 text-[12px] text-gray-700 bg-white border rounded-lg px-3 py-2 outline-none resize-none focus:ring-1 focus:ring-indigo-200 placeholder-gray-400"
+                            style={{ borderColor: '#E5E7EB' }}
+                          />
+                          <button
+                            onClick={() => removeQuizQuestion(idx, qIdx)}
+                            className="p-1 mt-1 text-gray-300 hover:text-red-400 rounded transition-colors flex-shrink-0"
+                            title="Remover pergunta"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
+                  {/* Delete topic */}
                   <button
                     onClick={() => removeTopic(idx)}
                     className="p-1.5 text-gray-300 hover:text-red-400 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"

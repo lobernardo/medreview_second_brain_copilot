@@ -4,6 +4,13 @@ export interface TrailItem {
   order: number
   title: string
   description?: string
+  materials?: {
+    type: 'video' | 'doc' | 'link'
+    label: string
+    url: string
+  }[]
+  quiz_questions?: string[]
+  estimated_minutes?: number
 }
 
 export interface OnboardingConfig {
@@ -30,18 +37,34 @@ export function buildOnboardingSystemPrompt(
   const trailSection =
     trail.length > 0
       ? `TRILHA DE APRENDIZADO (${trail.length} temas):\n${trail
-          .map((t, i) => `${i + 1}. ${t.title}${i === currentTopicIndex ? ' ← TEMA ATUAL' : ''}`)
+          .map((t, i) => {
+            let line = `${i + 1}. ${t.title}${i === currentTopicIndex ? ' ← TEMA ATUAL' : ''}`
+            if (t.estimated_minutes) line += ` (~${t.estimated_minutes}min)`
+            return line
+          })
           .join('\n')}`
-      : 'TRILHA: Ainda não configurada pelo gestor — responda perguntas gerais sobre a Med-Review.'
+      : 'TRILHA: Ainda não configurada pelo gestor. Responda perguntas gerais sobre a Med-Review e oriente o colaborador a aguardar a configuração da trilha.'
+
+  const materialsSection = currentTopic?.materials?.length
+    ? `\nMATERIAIS DO TEMA ATUAL:\n${currentTopic.materials
+        .map((m) => `- [${m.type.toUpperCase()}] ${m.label}: ${m.url}`)
+        .join('\n')}\nIndique esses materiais no momento certo da explicação. Diga ao colaborador para assistir/ler ANTES de continuar, quando fizer sentido.`
+    : ''
+
+  const quizSection = currentTopic?.quiz_questions?.length
+    ? `\nQUIZ DO TEMA ATUAL (aplicar ao final da explicação):\n${currentTopic.quiz_questions
+        .map((q, i) => `${i + 1}. ${q}`)
+        .join('\n')}\nApós explicar o tema, aplique essas perguntas UMA POR VEZ. Avalie a resposta do colaborador: se acertou, confirme e reforce. Se errou ou ficou incompleto, corrija com empatia e explique o ponto correto. Só avance pro próximo tema após o quiz.`
+    : ''
 
   const currentSection = currentTopic
-    ? `\nTEMA ATUAL: "${currentTopic.title}"${currentTopic.description ? `\nDescrição: ${currentTopic.description}` : ''}`
+    ? `\nTEMA ATUAL: "${currentTopic.title}"${currentTopic.description ? `\nObjetivo: ${currentTopic.description}` : ''}${materialsSection}${quizSection}`
     : ''
 
   const nextSection = nextTopic
-    ? `\nPRÓXIMO TEMA: "${nextTopic.title}" (sugira no final da resposta)`
+    ? `\nPRÓXIMO TEMA: "${nextTopic.title}" — sugira avançar quando o colaborador concluir o tema atual e o quiz.`
     : trail.length > 0
-    ? '\nEste é o último tema. Ao final, parabenize o colaborador pela conclusão da trilha.'
+    ? '\nEste é o ÚLTIMO TEMA da trilha. Ao concluir, parabenize o colaborador e faça um resumo do que foi aprendido.'
     : ''
 
   const profileSection = profile
@@ -49,41 +72,56 @@ export function buildOnboardingSystemPrompt(
 Nome: ${profile.name}
 Tom e estilo preferido: ${profile.style_notes || 'Didático e acolhedor'}
 Vertical de interesse: ${profile.vertical_focus || 'Ainda não definida'}
-
-Chame o colaborador pelo nome quando apropriado. Adapte a linguagem ao estilo dele.\n`
+Chame o colaborador pelo nome. Adapte a linguagem ao estilo dele.\n`
     : ''
 
-  return `Você é o Copilot de Onboarding do Grupo Med-Review. Seu papel é guiar novos colaboradores com tom ${tone}.
+  return `Você é o Copilot de Onboarding do Grupo Med-Review. Seu papel é treinar novos colaboradores para que em 1 semana conheçam a empresa, produtos, verticais, processos e estejam prontos para atuar.
+
+Tom: ${tone}
 ${profileSection}
-REGRAS:
-1. Explique conceitos com exemplos práticos e situações reais da Med-Review
-2. Após cada explicação, faça uma pergunta ou mini-quiz para fixar o aprendizado
-3. Termine sempre com uma sugestão clara do que estudar a seguir
-4. Se a pergunta sair da trilha, responda brevemente e volte ao contexto
-5. Nunca invente informações — baseie-se apenas no contexto fornecido
-6. Ensine o novo colaborador sobre o verdadeiro valor da Med-Review usando os Big Numbers como referência — esses dados devem ser internalizados pelo colaborador
+REGRAS INVIOLÁVEIS:
+1. NUNCA invente dados, números, funcionalidades, nomes de ferramentas ou qualquer informação que não esteja no contexto fornecido. Se não sabe, diga: "Não tenho essa informação na base — pergunte a um colega ou ao seu gestor."
+2. Siga a trilha configurada pelo gestor. Não pule temas. Não avance sem o colaborador confirmar que entendeu.
+3. Ao explicar um tema, use exemplos práticos do dia a dia da Med-Review — não teoria genérica.
+4. Quando houver materiais de apoio (vídeos, docs, links), indique-os no momento certo. Diga: "Antes de continuar, assista/leia [material]. Me avisa quando terminar."
+5. Ao final de cada tema, aplique o quiz configurado (se houver). Uma pergunta por vez. Avalie a resposta com empatia.
+6. Se o colaborador perguntar algo fora da trilha, responda brevemente usando o contexto disponível e volte ao tema.
+7. Ensine o verdadeiro valor da Med-Review usando Big Numbers e Verdadeiro Valor como referência — o colaborador precisa internalizar isso.
+8. Se o contexto estiver insuficiente, não invente. Sinalize: "Essa informação ainda não está na base — pergunte ao seu gestor."
+
+FLUXO DO ONBOARDING:
+1. Mensagem de boas-vindas → perguntar se o colaborador está pronto pra começar
+2. Quando disser que sim → iniciar pelo TEMA ATUAL da trilha
+3. Explicar o tema com exemplos práticos → indicar materiais quando houver
+4. Aplicar quiz ao final → avaliar respostas
+5. Sugerir avançar pro próximo tema
+6. No último tema → resumo geral + parabéns
 
 SOBRE A MED-REVIEW:
 - +5 anos de mercado · +26.000 alunos · +90% de satisfação
-- Verticais: R1, Anestesiologia (Anest), Oftalmologia (Oft), Ortopedia (Ortop)
+- Verticais: R1 (residência), Anest (anestesiologia), Oft (oftalmologia), Ortop (ortopedia)
 - Método: active recall + spaced repetition + IA personalizada por vertical
 - Professores aprovados nas provas — ensinam o que realmente cai
+- Ferramentas por vertical: GEAR e DEX (Anest), ÍRIS (Oft), TOR (Ortop)
 
 ${trailSection}${currentSection}${nextSection}
 
-${customInstructions ? `INSTRUÇÕES DO GESTOR:\n${customInstructions}\n` : ''}SOBRE O CONTEXTO RECEBIDO:
-- FAQs exibem um score de relevância. Se houver FAQ com relevância acima de 80%, use essa resposta como base — ela foi validada pelo time.
+${customInstructions ? `INSTRUÇÕES DO GESTOR:\n${customInstructions}\n` : ''}
+SOBRE O CONTEXTO RECEBIDO:
+- FAQs com relevância acima de 80%: use como resposta oficial, é validada pelo time.
+- Produtos no contexto: explique com base nos campos estruturados (ICP, pitch, o que inclui).
 - Não invente informações que não estejam no contexto abaixo.
 
 CONTEXTO DA BASE DE CONHECIMENTO:
 ${context || '(sem contexto disponível — responda com base nas informações acima)'}`.trim()
 }
 
-export function getWelcomeMessage(config: OnboardingConfig | null): string {
+export function getWelcomeMessage(config: OnboardingConfig | null, profileName?: string): string {
+  const name = profileName ? `, ${profileName}` : ''
   if (config?.welcome_message?.trim()) return config.welcome_message.trim()
   const firstTopic = config?.trail?.[0]
   if (firstTopic) {
-    return `Olá! Seja bem-vindo ao time Med-Review! 🎉\n\nVou ser seu guia nessa jornada de aprendizado. Nossa trilha começa com **"${firstTopic.title}"**.\n\nComo você prefere começar: quer que eu explique o contexto geral primeiro, ou prefere ir direto ao assunto?`
+    return `Olá${name}! Seja bem-vindo(a) ao time Med-Review! 🎉\n\nVou ser seu guia no onboarding. Temos ${config?.trail?.length || 0} temas pra percorrer juntos — começando por **"${firstTopic.title}"**.\n\nQuando estiver pronto(a) pra começar, é só me dizer!`
   }
-  return `Olá! Seja bem-vindo ao time Med-Review! 🎉\n\nEstou aqui para te ajudar a conhecer a empresa, os produtos e a forma como trabalhamos. Pode perguntar à vontade!`
+  return `Olá${name}! Seja bem-vindo(a) ao time Med-Review! 🎉\n\nA trilha de onboarding ainda está sendo configurada pelo gestor. Enquanto isso, pode me perguntar qualquer coisa sobre a empresa, produtos ou processos!`
 }

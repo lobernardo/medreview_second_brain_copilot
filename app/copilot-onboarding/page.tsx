@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { createBrowserClient } from '@supabase/ssr'
 import { getWelcomeMessage, type OnboardingConfig, type TrailItem } from '@/lib/ai/onboarding-prompt'
+import { useProfile } from '@/lib/context/profile-context'
 
 interface Source {
   id: string
@@ -83,6 +84,7 @@ function useOnboardingConfig() {
 export default function CopilotOnboardingPage() {
   const userId = useSupabaseUser()
   const { config, loading } = useOnboardingConfig()
+  const profile = useProfile()
   const [currentTopicIndex, setCurrentTopicIndex] = useState(0)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -97,7 +99,7 @@ export default function CopilotOnboardingPage() {
   useEffect(() => {
     if (!loading && !initialized) {
       setInitialized(true)
-      const welcome = getWelcomeMessage(config)
+      const welcome = getWelcomeMessage(config, profile?.name)
       setMessages([{ id: crypto.randomUUID(), role: 'assistant', content: welcome }])
     }
   }, [loading, initialized, config])

@@ -1,7 +1,7 @@
 # CLAUDE.md — Second Brain Med-Review
 
 > **Fonte de verdade do projeto. Leia antes de qualquer tarefa.**
-> **Versão:** 6.0 | Data: 15/05/2026
+> **Versão:** 7.0 | Data: 17/05/2026
 
 ---
 
@@ -53,9 +53,9 @@ OPENAI_API_KEY=sk-...
 ## 4. ARQUITETURA RAG
 
 ```
-Usuário → [SEMPRE] Busca VV + Big Numbers + Provas + Eventos (Promise.all)
-        → Embedding da mensagem (OpenAI text-embedding-3-small)
-        → Buscas vetoriais paralelas:
+Usuário → Promise.all([VV+BigNumbers, ExamDates, Events, Embedding(msg), Profile])
+        → detectVertical(msg) || profile.vertical_focus[0] || null  → vertical
+        → Buscas vetoriais paralelas (todas com filter_vertical):
             match_knowledge_base  (5 docs, 0.50)  — sempre
             match_faq             (3 docs, 0.50)  — sempre
             match_objections      (4 docs, 0.45)  — só mode "objeção"
@@ -63,13 +63,31 @@ Usuário → [SEMPRE] Busca VV + Big Numbers + Provas + Eventos (Promise.all)
             match_copys           (4 docs, 0.45)  — follow-up, proposta, copys
             match_quotes          (3 docs, 0.40)  — só mode "proposta"
         → Se sources < 2 → fallback textual (search_knowledge_base_text ILIKE)
-        → Contexto concatenado (max 12.000 chars)
+        → buildFinalContext():
+            ragParts  → truncate(8.000 chars, corta no último '.')
+            fixedParts → truncate(4.000 chars, corta no último '.')
+            contexto final = RAG primeiro + fixos depois (total ≤ 12.000 chars)
         → System prompt → LLM streaming → SSE → cliente
 ```
 
+**Detecção de vertical (`lib/ai/context-builder.ts`):**
+```typescript
+const VERTICAL_KEYWORDS = {
+  Anest: ['anest', 'anestesiologia', 'tea'],
+  Oft:   ['oft', 'oftalmologia', 'cbo'],
+  Ortop: ['ortop', 'ortopedia', 'taro'],
+  R1:    ['r1', 'residência', 'residencia', 'revalida'],
+}
+// Fallback: profile.vertical_focus.split(',')[0]
+```
+
+**Filtro de vertical nas RPCs:** `filter_vertical IS NULL OR p.vertical = filter_vertical OR p.vertical IS NULL OR p.vertical = 'Geral'` — documentos sem vertical ou com vertical 'Geral' sempre aparecem.
+
+**FAQ no contexto:** cada entrada exibe score — `[relevância: 87%]`. System prompt instrui a priorizar FAQs com relevância >80%.
+
 **LLM (`lib/ai/llm-client.ts`):** tenta OpenAI `gpt-4o-mini` (timeout 15s), fallback Groq `llama-3.3-70b-versatile`. `callLLMStream` para chat, `callLLMJson` para process-document.
 
-**Contexto fixo em toda consulta (`lib/ai/context-builder.ts`):** VerdadeiroValor + BigNumbers + ExamDates (próximas, ≥-7 dias) + CompanyEvents (próximos 30 dias) — resolvidos em Promise.all antes do RAG vetorial.
+**Erros de RAG:** todos os `catch` em `context-builder.ts` têm `console.error('[RAG] <função> failed:', err)` — sem falhas silenciosas.
 
 ---
 
@@ -86,6 +104,7 @@ app/
     ├── process-document/ copys/ faq/ objecoes/ kb/ templates/ leads/
     ├── big-numbers/ verdadeiro-valor/ favorites/ user-objection-responses/
     ├── exam-dates/ events/ produtos/
+    └── dica-do-dia/
 
 components/
 ├── layout/  app-shell.tsx sidebar.tsx header.tsx mobile-nav.tsx stub-page.tsx
@@ -150,9 +169,12 @@ Sidebar: gradiente `#1E1B4B → #2D2A7A`, 240px, texto `#C7D2FE`, active `bg-[#4
 ```sql
 profiles          (id, name, role, vertical_focus, phone, whatsapp_link, default_greeting, style_notes)
 knowledge_base    (id, title, content, category, vertical, tags, source_type, is_active, embedding)
-                  categories: produto|playbook|objeção-resposta|regra-comercial|diferencial|faq|template-followup|case-sucesso|script-copy
+                  categories: produto|playbook|tecnica-comercial|objeção-resposta|regra-comercial|
+                              diferencial|faq|template-followup|case-sucesso|script-copy
 objection_patterns(id, topic, definition, real_meaning, vertical, recommended_response, what_not_to_say, proof_points, win_rate, embedding)
-faq_items         (id, faq_type[interno|cliente], question, answer, vertical, status[rascunho|validado], is_active, embedding)
+faq_items         (id, faq_type[interno|cliente], question, answer, vertical, category, status[rascunho|validado], is_active, embedding)
+                  categories fixas: Produto|Provas & Datas|Pagamento|Acesso & Plataforma|
+                                    Processo Comercial|Pós-venda|Regras Internas|Outros
 user_copys        (id, user_id, category, vertical, title, message_text, when_to_use, is_shared, is_active, embedding)
 quote_examples    (id, vertical, product, context, quote_text, result[win|loss|pending], embedding)
 conversations     (id, user_id, copilot_type, mode, messages, context_used)
@@ -171,13 +193,18 @@ company_events    (id, type[lançamento|campanha|evento|deadline|outro], title, 
 
 ### 8.2 Funções RPC (pgvector)
 
+Todas as funções aceitam `filter_vertical text DEFAULT NULL`. A cláusula de filtro aplicada:
+```sql
+AND (filter_vertical IS NULL OR p.vertical = filter_vertical OR p.vertical IS NULL OR p.vertical = 'Geral')
 ```
-match_knowledge_base(query_embedding, match_count, match_threshold)
-match_faq(query_embedding, match_count, match_threshold)
-match_objections(query_embedding, match_count, match_threshold)
-match_copys(query_embedding, match_count, match_threshold, filter_user_id)
-match_quotes(query_embedding, match_count, match_threshold)
-search_knowledge_base_text(search_query)  -- fallback ILIKE
+
+```
+match_knowledge_base(query_embedding, match_count, match_threshold, filter_vertical)
+match_faq(query_embedding, match_count, match_threshold, filter_vertical)
+match_objections(query_embedding, match_count, match_threshold, filter_vertical)
+match_copys(query_embedding, match_count, match_threshold, filter_user_id, filter_vertical)
+match_quotes(query_embedding, match_count, match_threshold, filter_vertical)
+search_knowledge_base_text(search_query)  -- fallback ILIKE, sem filtro de vertical
 ```
 
 ---
@@ -190,9 +217,11 @@ search_knowledge_base_text(search_query)  -- fallback ILIKE
 - Mode `proposta`: gera JSON → renderizado pelo QuoteCard → Win/Loss salva em quote_examples
 - Detecção de intenção (4 padrões) definida no system prompt
 - Query params: `?lead=&vertical=&produto=&objecao=` (acionado pelo botão "Diagnóstico no Copilot" do No Radar)
+- Perfil do closer (nome, style_notes, default_greeting, vertical_focus) injetado no system prompt via `buildContext()` → `fetchUserProfile()`
 
 ### 9.2 Copilot Onboarding (`/copilot-onboarding`) — onboarding + gestor
 Sem mode selector. Guia pela trilha do gestor. Barra de progresso + botão "Próximo tema". Config em `onboarding_config` (singleton).
+Chama `buildContext(message, 'onboarding', user_id)` — tem acesso a FAQ, KB, provas e eventos via RAG.
 
 ### 9.3 Verdadeiro Valor (`/verdadeiro-valor`) — todos
 Seção 1: texto Markdown (tabela `verdadeiro_valor`, singleton) — gestor edita inline.
@@ -209,30 +238,36 @@ Momentos: reengajamento, follow-up, negociação, encerramento, etc. Favoritos e
 
 ### 9.7 FAQ (`/faq`) — todos
 2 tabs: Comercial | Clientes. Status rascunho/validado. RAG usa só validados.
+Campo `category` com 8 opções fixas via `<select>`: Produto | Provas & Datas | Pagamento | Acesso & Plataforma | Processo Comercial | Pós-venda | Regras Internas | Outros.
+No contexto do RAG, cada FAQ exibe score: `[relevância: 87%]`. LLM é instruído a priorizar FAQs com relevância >80%.
 
 ### 9.8 Matriz de Objeções (`/objecoes`) — closer + gestor
 Accordion por objeção. Elemento principal: `definition` (frase exata). "Minha resposta" por closer em `user_objection_responses`. GET retorna `{ patterns, responses }`.
 
 ### 9.9 Knowledge Base (`/kb`) — todos (gestor edita)
 3 formas: escrever | importar .md/.txt | transcrever áudio (Whisper). Fluxo 3 steps: form → process-document (LLM sugere categoria/tags) → review → salvar.
+Categoria `tecnica-comercial` alimenta o Insight do Dia na Home e é indexada no RAG.
 
 ### 9.10 Agenda (`/agenda`) — todos (gestor edita)
 Seção 1: Provas & Datas com countdown colorido. Campo `monday_item_id` (URL Monday clicável).
 Seção 2: Calendário de eventos agrupado por mês. Multi-select verticais.
 
 ### 9.11 Catálogo de Produtos (`/produtos`) — todos (gestor edita)
-Form estruturado (13 campos) → Markdown → salvo em `knowledge_base` com `category='produto'`, `tags[0]=status`. Índexado no RAG automaticamente.
+Form estruturado (13 campos) → `buildContent()` gera Markdown completo → salvo em `knowledge_base` com `category='produto'`, `tags[0]=status`.
+**Embedding usa o `content` completo** (Markdown com todos os campos: ICP, pitch, objeções, condições, quando usar, etc.) — o `POST /api/produtos` retorna `{ id, content }` e o client usa `json.data.content` para a chamada ao `/api/embeddings`.
 
 ### 9.12 Configurações (`/settings`) — todos
-Dados pessoais + `vertical_focus` (multi-select chips, salvo como string "R1,Anest"). Style Wizard 5 passos → `style_notes`. Salva via `PATCH /api/profile`.
+Dados pessoais + `vertical_focus` (multi-select chips, salvo como string "R1,Anest"). Style Wizard 5 passos (Tom, Emoji, Tratamento, Encerramento, Exemplo) → `style_notes`. Salva via `PATCH /api/profile`.
 
 ### 9.13 Home (`/`) — todos
 Ordem das seções:
 1. **Saudação** — nome + data
-2. **Alertas Comerciais** — avisos de provas próximas gerados de `exam_dates` (≤30d vermelho, 31-90d âmbar, inscrições fechando ≤10d amarelo). Máx 4. Visível para closer + gestor.
-3. **Esta Semana** — `company_events` nos próximos 7 dias. Mostra "Nenhum evento" se vazio.
-4. **Próximos 30 dias** — `company_events` entre 8 e 30 dias. Seção oculta se vazio.
-5. **Acesso rápido** — grid 4 cards com links por role.
+2. **Insight do Dia** — doc da categoria `tecnica-comercial` da KB, rotação diária por `dayOfYear % total`. Oculto se base vazia. Toggle "ver mais/menos" com preview de 300 chars.
+3. **Alertas Comerciais** — avisos de provas próximas gerados de `exam_dates` (≤30d vermelho, 31-90d âmbar, inscrições fechando ≤10d amarelo). Máx 4. Visível para closer + gestor.
+4. **Próximas Provas** — 5 próximas provas com countdown colorido (≤30d vermelho, 31-60d amarelo, >60d verde), badge de vertical. Visível para todos.
+5. **Esta Semana** — `company_events` nos próximos 7 dias. Mostra "Nenhum evento" se vazio.
+6. **Próximos 30 dias** — `company_events` entre 8 e 30 dias. Seção oculta se vazio.
+7. **Acesso rápido** — grid 4 cards com links por role.
 
 ---
 
@@ -243,9 +278,10 @@ Ordem das seções:
 | `/api/copilot-vendas` | POST | Streaming chat vendas (RAG + LLM) |
 | `/api/copilot-onboarding` | POST | Streaming chat onboarding |
 | `/api/profile` | PATCH | Atualizar perfil |
-| `/api/embeddings` | POST | Gera e salva embedding na tabela |
+| `/api/embeddings` | POST | Gera e salva embedding na tabela (allowlist: knowledge_base, faq_items, user_copys, quote_examples, objection_patterns, whatsapp_templates) |
 | `/api/transcribe` | POST | Transcreve áudio via Whisper |
 | `/api/process-document` | POST | LLM analisa conteúdo → sugere categoria/tags/chunks |
+| `/api/dica-do-dia` | GET | Retorna 1 doc de `tecnica-comercial` por rotação diária |
 | `/api/copys` | GET/POST/DELETE | user_copys — GET retorna `{ mine, team }` |
 | `/api/faq` | GET/POST/DELETE | faq_items |
 | `/api/objecoes` | GET/POST/DELETE | objection_patterns — GET retorna `{ patterns, responses }` |
@@ -258,30 +294,44 @@ Ordem das seções:
 | `/api/user-objection-responses` | POST/DELETE | respostas pessoais de objeções |
 | `/api/exam-dates` | GET/POST/DELETE | exam_dates |
 | `/api/events` | GET/POST/DELETE | company_events |
-| `/api/produtos` | GET/POST/DELETE | knowledge_base WHERE category='produto' |
+| `/api/produtos` | GET/POST/DELETE | knowledge_base WHERE category='produto' — POST retorna `{ id, content }` |
 
 ---
 
 ## 11. SYSTEM PROMPTS
 
 **Vendas** (`lib/ai/vendas-prompt.ts`): `buildVendasSystemPrompt(mode, context, profile?)`
-Seções: IDENTIDADE (fala COM o closer) → REGRAS → DIFERENCIAIS → PROVAS/EVENTOS → VERDADEIRO VALOR/BIG NUMBERS → CONTEXTO QUE VOCÊ RECEBE E COMO USAR (8 blocos) → PERSONALIZAÇÃO DO CLOSER (nome/tom/vertical via profile) → COMO RESPONDER (4 intenções) → REGRAS DE SEPARAÇÃO/LACUNA → MODO + FORMATO + CONTEXTO RAG.
+Seções: IDENTIDADE (fala COM o closer) → REGRAS → DIFERENCIAIS → PROVAS/EVENTOS → VERDADEIRO VALOR/BIG NUMBERS → CONTEXTO QUE VOCÊ RECEBE E COMO USAR (8 blocos abaixo) → PERSONALIZAÇÃO DO CLOSER (nome/tom/vertical via profile) → COMO RESPONDER (4 intenções) → REGRAS DE SEPARAÇÃO/LACUNA → MODO + FORMATO + CONTEXTO RAG.
 
-**Onboarding** (`lib/ai/onboarding-prompt.ts`): `buildOnboardingSystemPrompt(config, context, topicIndex)`
-Injeta: trilha de temas, tema atual, próximo tema, instruções do gestor, contexto RAG.
+**8 blocos do "CONTEXTO QUE VOCÊ RECEBE E COMO USAR":**
+1. VERDADEIRO VALOR + BIG NUMBERS — argumentação e objeções de confiança
+2. DATAS DE PROVAS — urgência, janelas de decisão
+3. EVENTOS PRÓXIMOS — lançamentos, campanhas, ganchos de reengajamento
+4. BASE DE CONHECIMENTO (RAG) — produtos, playbooks, regras, diferenciais
+5. FAQ — respostas validadas; se relevância >80%, priorizar sobre resposta genérica
+6. OBJEÇÕES — resposta recomendada + resposta pessoal do closer (se existir)
+7. COPYS DO TIME — referência de tom para follow-up, proposta e copys
+8. PERFIL DO CLOSER — adaptar tom, tratar pelo nome
+
+**Onboarding** (`lib/ai/onboarding-prompt.ts`): `buildOnboardingSystemPrompt(config, context, topicIndex, profile?)`
+Injeta: trilha de temas, tema atual, próximo tema, instruções do gestor, bloco "SOBRE O CONTEXTO RECEBIDO" (instrução FAQ >80%), contexto RAG.
 
 ---
 
 ## 12. EMBEDDING AUTOMÁTICO
 
 ```typescript
-// Após salvar em KB, FAQ, Objeções, Copys, Templates:
+// Após salvar em KB, FAQ, Objeções, Copys, Templates, Produtos:
 fetch('/api/embeddings', {
   method: 'POST',
-  body: JSON.stringify({ table: 'knowledge_base', id: doc.id, content: doc.content }),
+  body: JSON.stringify({ table: 'knowledge_base', id: doc.id, content: savedContent }),
 }).catch(() => {})  // fire-and-forget
-// Tabelas: knowledge_base, faq_items, user_copys, objection_patterns, quote_examples, whatsapp_templates
+
+// Tabelas na allowlist: knowledge_base, faq_items, user_copys,
+//                       objection_patterns, quote_examples, whatsapp_templates
 ```
+
+**Produtos:** o `POST /api/produtos` retorna `{ id, content }` onde `content` é o Markdown completo gerado por `buildContent()`. A página de produtos usa `json.data.content` — o embedding representa todos os 13 campos do produto (ICP, pitch, objeções, condições comerciais, quando usar, etc.).
 
 ---
 
@@ -322,8 +372,9 @@ Chat user: `bg-[#EEF2FF] rounded-2xl` (direita) | Chat copilot: `bg-white border
 | 8.8 | Multi-select vertical + modo produto 2 versões + home comercial | ✅ |
 | 8.9 | Identidade do Copilot (fala COM closer) + detecção de intenção + lacuna | ✅ |
 | 8.10 | Polish responsivo: overflow-x, prose/markdown, viewport, header | ✅ |
-| 8.11 | RAG: user_objection_responses no contexto de objeções; prompt com bloco "CONTEXTO QUE VOCÊ RECEBE"; home reordenada (Alertas → Esta Semana → Próximos 30 dias) | ✅ |
-| 9 | Seed — importar docs reais + embeddings em massa | ⏳ |
+| 8.11 | RAG: user_objection_responses no contexto de objeções; prompt com bloco "CONTEXTO QUE VOCÊ RECEBE"; home reordenada | ✅ |
+| 8.12 | Correções RAG: embedding produto (content completo), whatsapp_templates na allowlist, filtro vertical nas 5 RPCs, detectVertical(), truncate separado (8k RAG + 4k fixo), ordem RAG-primeiro, catches com console.error, FAQ categories select, FAQ score no contexto, FAQ priorizado >80%, categoria tecnica-comercial na KB, Insight do Dia na Home, Próximas Provas na Home | ✅ |
+| 9 | Seed — importar docs reais (produtos, técnicas comerciais, playbooks) + embeddings | ⏳ |
 | 10 | Polish final + Deploy Vercel | ⏳ |
 
 ---
