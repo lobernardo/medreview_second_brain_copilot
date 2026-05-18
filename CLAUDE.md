@@ -1,7 +1,7 @@
 # CLAUDE.md — Second Brain Med-Review
 
 > **Fonte de verdade do projeto. Leia antes de qualquer tarefa.**
-> **Versão:** 7.0 | Data: 17/05/2026
+> **Versão:** 8.0 | Data: 18/05/2026
 
 ---
 
@@ -12,9 +12,9 @@
 | Copilot | Quem usa | Para quê |
 |---------|----------|----------|
 | **Copilot Vendas** | closers + gestores | Objeções, propostas, diagnóstico, follow-up, copys |
-| **Copilot Onboarding** | novos colaboradores + gestores | Aprender produtos, processos, regras do time |
+| **Copilot Onboarding** | onboarding + gestores | Aprender produtos, processos, regras do time |
 
-Outros módulos: Verdadeiro Valor, No Radar (leads), Copys & Macros, Templates WhatsApp, FAQ, Matriz de Objeções, Knowledge Base, Agenda, Catálogo de Produtos.
+Outros módulos: Verdadeiro Valor, No Radar (leads), Copys & Macros, Templates WhatsApp, FAQ, Matriz de Objeções, Knowledge Base, Agenda, Catálogo de Produtos, Gestão de Usuários, Acompanhamento de Onboarding.
 
 ---
 
@@ -55,20 +55,26 @@ OPENAI_API_KEY=sk-...
 ```
 Usuário → Promise.all([VV+BigNumbers, ExamDates, Events, Embedding(msg), Profile])
         → detectVertical(msg) || profile.vertical_focus[0] || null  → vertical
-        → Buscas vetoriais paralelas (todas com filter_vertical):
-            match_knowledge_base  (5 docs, 0.50)  — sempre
-            match_faq             (3 docs, 0.50)  — sempre
+        → Buscas vetoriais + keyword em paralelo:
+            matchProductsByKeyword  — só mode "produto" → productParts[] (PRIMÁRIO)
+            match_knowledge_base  (5 docs, 0.45)  — sempre → ragParts[]
+            match_faq             (3 docs, 0.50)  — sempre → ragParts[]
             match_objections      (4 docs, 0.45)  — só mode "objeção"
               + user_objection_responses do closer (se userId disponível)
             match_copys           (4 docs, 0.45)  — follow-up, proposta, copys
             match_quotes          (3 docs, 0.40)  — só mode "proposta"
-        → Se sources < 2 → fallback textual (search_knowledge_base_text ILIKE)
+        → matchKb retorna boolean (kbFound)
+        → Se sources < 2 || !kbFound → fallback textual (search_knowledge_base_text ILIKE)
         → buildFinalContext():
+            allRagParts = [...productParts, ...ragParts]  ← produto sempre primeiro
             ragParts  → truncate(8.000 chars, corta no último '.')
             fixedParts → truncate(4.000 chars, corta no último '.')
             contexto final = RAG primeiro + fixos depois (total ≤ 12.000 chars)
         → System prompt → LLM streaming → SSE → cliente
 ```
+
+**Produto como fonte primária (mode `produto`):**
+`matchProductsByKeyword` usa keyword matching no título (`title ILIKE %keyword%`) com filtro `category='produto'` e `is_active=true`. Extrai keywords do message filtrando `STOP_WORDS` (conjunções, verbos genéricos, etc.) e palavras com < 4 chars. Popula `productParts[]` separado, colocado ANTES do `ragParts[]` no contexto. `similarity: 1` sinaliza prioridade. O system prompt instrui: seção `## Produto` é fonte primária e definitiva; FAQ e KB são complementares.
 
 **Detecção de vertical (`lib/ai/context-builder.ts`):**
 ```typescript
@@ -99,12 +105,15 @@ app/
 ├── login/ copilot-vendas/ copilot-onboarding/ onboarding-config/
 ├── copys/ leads/ templates/ faq/ objecoes/ kb/
 ├── verdadeiro-valor/ agenda/ produtos/ settings/
+├── usuarios/ onboarding-acompanhamento/
 └── api/
     ├── copilot-vendas/ copilot-onboarding/ profile/ embeddings/ transcribe/
     ├── process-document/ copys/ faq/ objecoes/ kb/ templates/ leads/
     ├── big-numbers/ verdadeiro-valor/ favorites/ user-objection-responses/
-    ├── exam-dates/ events/ produtos/
-    └── dica-do-dia/
+    ├── exam-dates/ events/ produtos/ dica-do-dia/
+    ├── onboarding-config/ onboarding-progress/ onboarding-quiz/
+    ├── onboarding-acompanhamento/ onboarding-acompanhamento/[userId]/
+    └── usuarios/
 
 components/
 ├── layout/  app-shell.tsx sidebar.tsx header.tsx mobile-nav.tsx stub-page.tsx
@@ -141,21 +150,23 @@ export async function GET/POST/DELETE(request: Request) {
 ## 7. SIDEBAR — VISIBILIDADE POR ROLE
 
 ```
-Item                  | Rota                | closer | gestor | onboarding
-Home                  | /                   |  ✅    |  ✅    |  ✅
-Copilot Vendas        | /copilot-vendas     |  ✅    |  ✅    |
-Copilot Onboarding    | /copilot-onboarding |        |  ✅    |  ✅
-Verdadeiro Valor      | /verdadeiro-valor   |  ✅    |  ✅    |  ✅
-Agenda                | /agenda             |  ✅    |  ✅    |  ✅
-No Radar              | /leads              |  ✅    |  ✅    |
-Copys                 | /copys              |  ✅    |  ✅    |
-Templates             | /templates          |  ✅    |  ✅    |
-Produtos              | /produtos           |  ✅    |  ✅    |  ✅
-FAQ                   | /faq                |  ✅    |  ✅    |  ✅
-Matriz de Objeções    | /objecoes           |  ✅    |  ✅    |
-Knowledge Base        | /kb                 |  ✅    |  ✅    |  ✅
-Config Onboarding     | /onboarding-config  |        |  ✅    |
-Configurações         | /settings           |  ✅    |  ✅    |  ✅
+Item                  | Rota                        | closer | gestor | onboarding
+Home                  | /                           |  ✅    |  ✅    |  ✅
+Copilot Vendas        | /copilot-vendas             |  ✅    |  ✅    |
+Copilot Onboarding    | /copilot-onboarding         |        |  ✅    |  ✅
+Verdadeiro Valor      | /verdadeiro-valor           |  ✅    |  ✅    |  ✅
+Agenda                | /agenda                     |  ✅    |  ✅    |  ✅
+No Radar              | /leads                      |  ✅    |  ✅    |
+Copys                 | /copys                      |  ✅    |  ✅    |
+Templates             | /templates                  |  ✅    |  ✅    |
+Produtos              | /produtos                   |  ✅    |  ✅    |  ✅
+FAQ                   | /faq                        |  ✅    |  ✅    |  ✅
+Matriz de Objeções    | /objecoes                   |  ✅    |  ✅    |
+Knowledge Base        | /kb                         |  ✅    |  ✅    |  ✅
+Usuários              | /usuarios                   |        |  ✅    |
+Acompanhamento        | /onboarding-acompanhamento  |        |  ✅    |
+Config Onboarding     | /onboarding-config          |        |  ✅    |
+Configurações         | /settings                   |  ✅    |  ✅    |  ✅
 ```
 
 Sidebar: gradiente `#1E1B4B → #2D2A7A`, 240px, texto `#C7D2FE`, active `bg-[#4338CA]`.
@@ -167,27 +178,57 @@ Sidebar: gradiente `#1E1B4B → #2D2A7A`, 240px, texto `#C7D2FE`, active `bg-[#4
 ### 8.1 Tabelas
 
 ```sql
-profiles          (id, name, role, vertical_focus, phone, whatsapp_link, default_greeting, style_notes)
+profiles          (id, name, role[closer|gestor|onboarding], vertical_focus, phone,
+                   whatsapp_link, default_greeting, style_notes)
+
 knowledge_base    (id, title, content, category, vertical, tags, source_type, is_active, embedding)
                   categories: produto|playbook|tecnica-comercial|objeção-resposta|regra-comercial|
                               diferencial|faq|template-followup|case-sucesso|script-copy
-objection_patterns(id, topic, definition, real_meaning, vertical, recommended_response, what_not_to_say, proof_points, win_rate, embedding)
-faq_items         (id, faq_type[interno|cliente], question, answer, vertical, category, status[rascunho|validado], is_active, embedding)
+
+objection_patterns(id, topic, definition, real_meaning, vertical, recommended_response,
+                   what_not_to_say, proof_points, win_rate, embedding)
+
+faq_items         (id, faq_type[interno|cliente], question, answer, vertical, category,
+                   status[rascunho|validado], is_active, embedding)
                   categories fixas: Produto|Provas & Datas|Pagamento|Acesso & Plataforma|
                                     Processo Comercial|Pós-venda|Regras Internas|Outros
-user_copys        (id, user_id, category, vertical, title, message_text, when_to_use, is_shared, is_active, embedding)
+
+user_copys        (id, user_id, category, vertical, title, message_text, when_to_use,
+                   is_shared, is_active, embedding)
+
 quote_examples    (id, vertical, product, context, quote_text, result[win|loss|pending], embedding)
+
 conversations     (id, user_id, copilot_type, mode, messages, context_used)
-onboarding_config (id, trail, custom_instructions, welcome_message, tone, max_complexity, focus_verticals)
+
+onboarding_config (id, trail, custom_instructions, welcome_message, tone,
+                   max_complexity, focus_verticals)
+                  -- singleton; trail é array de strings com os temas da trilha
+
+onboarding_progress (id, user_id, topic_index, topic_title, status[in_progress|completed],
+                     started_at, completed_at)
+
+onboarding_quiz_results (id, user_id, topic_index, topic_title, question, user_answer,
+                          is_correct, copilot_feedback, created_at)
+
 meus_leads        (id, user_id, name, vertical, product_interest, objection_main, notes, phone, email)
+
 whatsapp_templates(id, name, momento, copy_text, variables, vertical, is_active, embedding)
+
 user_favorite_templates (id, user_id, template_id)
+
 user_objection_responses(id, user_id, objection_id, response_text)
+
 verdadeiro_valor  (id, content, updated_at)  -- singleton
+
 big_numbers       (id, label, value, description, category, vertical, is_highlight, sort_order)
                   -- NÃO tem is_active; DELETE é hard delete
-exam_dates        (id, vertical, name, exam_date, registration_start, registration_end, is_active, monday_item_id)
-company_events    (id, type[lançamento|campanha|evento|deadline|outro], title, description, event_date, end_date, verticals, is_active, monday_item_id)
+
+exam_dates        (id, vertical, name, exam_date, registration_start, registration_end,
+                   is_active, monday_item_id)
+
+company_events    (id, type[lançamento|campanha|evento|deadline|outro], title, description,
+                   event_date, end_date, verticals, is_active, monday_item_id)
+
 -- Produtos: salvos em knowledge_base com category='produto', tags[0]=status
 ```
 
@@ -213,15 +254,26 @@ search_knowledge_base_text(search_query)  -- fallback ILIKE, sem filtro de verti
 
 ### 9.1 Copilot Vendas (`/copilot-vendas`) — closer + gestor
 8 modos: `diagnose` `objeção` `proposta` `produto` `follow-up` `regra` `copys` `livre`
-- Mode `produto`: duas seções — 📋 SOBRE O PRODUTO + 🎯 VERSÃO COMERCIAL. Nunca mistura produtos.
+
+**Mode `produto`:**
+- `matchProductsByKeyword` roda em PARALELO e popula `productParts[]` separado
+- Produto aparece PRIMEIRO no contexto RAG (antes do vetor KB e FAQ)
+- Duas seções na resposta: 📋 SOBRE O PRODUTO + 🎯 VERSÃO COMERCIAL. Nunca mistura produtos.
+- System prompt: seção `## Produto` é fonte primária; FAQ e KB são complementares
+
+**Outros modos:**
 - Mode `proposta`: gera JSON → renderizado pelo QuoteCard → Win/Loss salva em quote_examples
-- Detecção de intenção (4 padrões) definida no system prompt
+- Detecção de intenção (6 padrões) definida no system prompt
 - Query params: `?lead=&vertical=&produto=&objecao=` (acionado pelo botão "Diagnóstico no Copilot" do No Radar)
 - Perfil do closer (nome, style_notes, default_greeting, vertical_focus) injetado no system prompt via `buildContext()` → `fetchUserProfile()`
 
 ### 9.2 Copilot Onboarding (`/copilot-onboarding`) — onboarding + gestor
-Sem mode selector. Guia pela trilha do gestor. Barra de progresso + botão "Próximo tema". Config em `onboarding_config` (singleton).
+Sem mode selector. Guia pela trilha do gestor. Barra de progresso + botão "Próximo tema".
+Config carregada via `GET /api/onboarding-config` (não mais direto no Supabase).
+Rastreia progresso em `onboarding_progress` via `POST /api/onboarding-progress`.
+Quiz ao fim de cada tema salva em `onboarding_quiz_results` via `POST /api/onboarding-quiz`.
 Chama `buildContext(message, 'onboarding', user_id)` — tem acesso a FAQ, KB, provas e eventos via RAG.
+API `/api/copilot-onboarding` requer autenticação.
 
 ### 9.3 Verdadeiro Valor (`/verdadeiro-valor`) — todos
 Seção 1: texto Markdown (tabela `verdadeiro_valor`, singleton) — gestor edita inline.
@@ -245,7 +297,9 @@ No contexto do RAG, cada FAQ exibe score: `[relevância: 87%]`. LLM é instruíd
 Accordion por objeção. Elemento principal: `definition` (frase exata). "Minha resposta" por closer em `user_objection_responses`. GET retorna `{ patterns, responses }`.
 
 ### 9.9 Knowledge Base (`/kb`) — todos (gestor edita)
-3 formas: escrever | importar .md/.txt | transcrever áudio (Whisper). Fluxo 3 steps: form → process-document (LLM sugere categoria/tags) → review → salvar.
+3 formas: escrever | importar .md/.txt | transcrever áudio (Whisper).
+Fluxo 3 steps: form → process-document (LLM sugere categoria/tags) → review → salvar.
+**`process-document`:** LLM copia o conteúdo EXATAMENTE como recebido — sem resumir, sem cortar, sem reorganizar. Apenas estrutura em JSON com `formatted_content` (verbatim) e `chunks` (divisão em 500-1500 palavras sem omitir nada).
 Categoria `tecnica-comercial` alimenta o Insight do Dia na Home e é indexada no RAG.
 
 ### 9.10 Agenda (`/agenda`) — todos (gestor edita)
@@ -253,6 +307,7 @@ Seção 1: Provas & Datas com countdown colorido. Campo `monday_item_id` (URL Mo
 Seção 2: Calendário de eventos agrupado por mês. Multi-select verticais.
 
 ### 9.11 Catálogo de Produtos (`/produtos`) — todos (gestor edita)
+Apenas edição de produtos existentes. **Não há botão "Novo produto"** — toda inserção de produto é feita via Knowledge Base (`/kb`) com `category = 'produto'`.
 Form estruturado (13 campos) → `buildContent()` gera Markdown completo → salvo em `knowledge_base` com `category='produto'`, `tags[0]=status`.
 **Embedding usa o `content` completo** (Markdown com todos os campos: ICP, pitch, objeções, condições, quando usar, etc.) — o `POST /api/produtos` retorna `{ id, content }` e o client usa `json.data.content` para a chamada ao `/api/embeddings`.
 
@@ -269,6 +324,23 @@ Ordem das seções:
 6. **Próximos 30 dias** — `company_events` entre 8 e 30 dias. Seção oculta se vazio.
 7. **Acesso rápido** — grid 4 cards com links por role.
 
+### 9.14 Gestão de Usuários (`/usuarios`) — gestor
+Lista todos os usuários do sistema (profiles). Gestor pode alterar role via `PATCH /api/usuarios`.
+**Proteção contra auto-rebaixamento:** gestor não pode alterar o próprio role.
+Roles disponíveis: `closer` | `gestor` | `onboarding`.
+
+### 9.15 Config Onboarding (`/onboarding-config`) — gestor
+Configura a trilha do Copilot Onboarding: temas da trilha (array), instruções personalizadas, mensagem de boas-vindas, tom, complexidade máxima, verticais de foco.
+Salvo via `POST /api/onboarding-config` (upsert — cria se não existe, atualiza se tem `id`).
+Seção "Ativar Onboarding por Colaborador": lista usuários com role `closer` e permite ativar onboarding (→ role `onboarding`) ou reverter (→ role `closer`). Usa `GET /api/usuarios` + `PATCH /api/usuarios`.
+
+### 9.16 Acompanhamento Onboarding (`/onboarding-acompanhamento`) — gestor
+Painel do gestor para monitorar todos os colaboradores em onboarding.
+Dados agregados por usuário: progresso por tema, % de conclusão, status (`not_started | in_progress | paused | completed`), última atividade.
+`status = 'paused'` quando `last_activity > 7 dias atrás` e onboarding não concluído.
+Taxa de erros por tema (top 3 tópicos com mais erros no quiz).
+Drill-down por colaborador via `GET /api/onboarding-acompanhamento/[userId]`.
+
 ---
 
 ## 10. API ROUTES
@@ -276,11 +348,11 @@ Ordem das seções:
 | Route | Método | O que faz |
 |-------|--------|-----------|
 | `/api/copilot-vendas` | POST | Streaming chat vendas (RAG + LLM) |
-| `/api/copilot-onboarding` | POST | Streaming chat onboarding |
-| `/api/profile` | PATCH | Atualizar perfil |
+| `/api/copilot-onboarding` | POST | Streaming chat onboarding (requer auth) |
+| `/api/profile` | PATCH | Atualizar perfil do usuário autenticado |
 | `/api/embeddings` | POST | Gera e salva embedding na tabela (allowlist: knowledge_base, faq_items, user_copys, quote_examples, objection_patterns, whatsapp_templates) |
 | `/api/transcribe` | POST | Transcreve áudio via Whisper |
-| `/api/process-document` | POST | LLM analisa conteúdo → sugere categoria/tags/chunks |
+| `/api/process-document` | POST | LLM analisa conteúdo → sugere categoria/tags/chunks (conteúdo verbatim, sem corte) |
 | `/api/dica-do-dia` | GET | Retorna 1 doc de `tecnica-comercial` por rotação diária |
 | `/api/copys` | GET/POST/DELETE | user_copys — GET retorna `{ mine, team }` |
 | `/api/faq` | GET/POST/DELETE | faq_items |
@@ -289,19 +361,25 @@ Ordem das seções:
 | `/api/templates` | GET/POST/DELETE | whatsapp_templates — GET retorna `{ templates, favorites }` |
 | `/api/leads` | GET/POST/DELETE | meus_leads |
 | `/api/big-numbers` | GET/POST/DELETE | big_numbers |
-| `/api/verdadeiro-valor` | GET/POST | singleton + big_numbers |
+| `/api/verdadeiro-valor` | GET/POST | singleton verdadeiro_valor |
 | `/api/favorites` | POST/DELETE | user_favorite_templates |
 | `/api/user-objection-responses` | POST/DELETE | respostas pessoais de objeções |
 | `/api/exam-dates` | GET/POST/DELETE | exam_dates |
 | `/api/events` | GET/POST/DELETE | company_events |
 | `/api/produtos` | GET/POST/DELETE | knowledge_base WHERE category='produto' — POST retorna `{ id, content }` |
+| `/api/onboarding-config` | GET/POST | GET: qualquer auth; POST: só gestor — upsert onboarding_config |
+| `/api/onboarding-progress` | GET/POST | Progresso por tema do usuário autenticado |
+| `/api/onboarding-quiz` | GET/POST | Resultados de quiz — GET aceita `?user_id=` (gestor pode ver outros) |
+| `/api/onboarding-acompanhamento` | GET | Gestor: dados agregados de todos os colaboradores em onboarding |
+| `/api/onboarding-acompanhamento/[userId]` | GET | Gestor: dados detalhados de um colaborador específico |
+| `/api/usuarios` | GET/PATCH | GET: lista profiles (gestor); PATCH: altera role com proteção contra auto-rebaixamento |
 
 ---
 
 ## 11. SYSTEM PROMPTS
 
 **Vendas** (`lib/ai/vendas-prompt.ts`): `buildVendasSystemPrompt(mode, context, profile?)`
-Seções: IDENTIDADE (fala COM o closer) → REGRAS → DIFERENCIAIS → PROVAS/EVENTOS → VERDADEIRO VALOR/BIG NUMBERS → CONTEXTO QUE VOCÊ RECEBE E COMO USAR (8 blocos abaixo) → PERSONALIZAÇÃO DO CLOSER (nome/tom/vertical via profile) → COMO RESPONDER (4 intenções) → REGRAS DE SEPARAÇÃO/LACUNA → MODO + FORMATO + CONTEXTO RAG.
+Seções: IDENTIDADE (fala COM o closer) → REGRAS → DIFERENCIAIS → PROVAS/EVENTOS → VERDADEIRO VALOR/BIG NUMBERS → CONTEXTO QUE VOCÊ RECEBE E COMO USAR (8 blocos abaixo) → PERSONALIZAÇÃO DO CLOSER (nome/tom/vertical via profile) → COMO RESPONDER (6 intenções) → REGRAS DE SEPARAÇÃO/LACUNA → PRIORIDADE DE FONTE NO MODO PRODUTO → MODO + FORMATO + CONTEXTO RAG.
 
 **8 blocos do "CONTEXTO QUE VOCÊ RECEBE E COMO USAR":**
 1. VERDADEIRO VALOR + BIG NUMBERS — argumentação e objeções de confiança
@@ -312,6 +390,10 @@ Seções: IDENTIDADE (fala COM o closer) → REGRAS → DIFERENCIAIS → PROVAS/
 6. OBJEÇÕES — resposta recomendada + resposta pessoal do closer (se existir)
 7. COPYS DO TIME — referência de tom para follow-up, proposta e copys
 8. PERFIL DO CLOSER — adaptar tom, tratar pelo nome
+
+**PRIORIDADE DE FONTE NO MODO PRODUTO (regra no prompt):**
+Quando o contexto contiver `## Produto`, esse bloco é fonte primária e definitiva.
+FAQ e KB são complementares — não contradizem nem substituem o que está em `## Produto`.
 
 **Onboarding** (`lib/ai/onboarding-prompt.ts`): `buildOnboardingSystemPrompt(config, context, topicIndex, profile?)`
 Injeta: trilha de temas, tema atual, próximo tema, instruções do gestor, bloco "SOBRE O CONTEXTO RECEBIDO" (instrução FAQ >80%), contexto RAG.
@@ -374,6 +456,7 @@ Chat user: `bg-[#EEF2FF] rounded-2xl` (direita) | Chat copilot: `bg-white border
 | 8.10 | Polish responsivo: overflow-x, prose/markdown, viewport, header | ✅ |
 | 8.11 | RAG: user_objection_responses no contexto de objeções; prompt com bloco "CONTEXTO QUE VOCÊ RECEBE"; home reordenada | ✅ |
 | 8.12 | Correções RAG: embedding produto (content completo), whatsapp_templates na allowlist, filtro vertical nas 5 RPCs, detectVertical(), truncate separado (8k RAG + 4k fixo), ordem RAG-primeiro, catches com console.error, FAQ categories select, FAQ score no contexto, FAQ priorizado >80%, categoria tecnica-comercial na KB, Insight do Dia na Home, Próximas Provas na Home | ✅ |
+| 8.13 | Onboarding fases B+C (tracking de progresso + quiz + painel do gestor), gestão de usuários com proteção auto-rebaixamento, onboarding-config via API route (fix RLS), ativação de colaboradores por role, auth no copilot-onboarding, process-document verbatim, produto como fonte primária no RAG (matchProductsByKeyword paralelo + productParts[]), remoção do botão "Novo produto" | ✅ |
 | 9 | Seed — importar docs reais (produtos, técnicas comerciais, playbooks) + embeddings | ⏳ |
 | 10 | Polish final + Deploy Vercel | ⏳ |
 
