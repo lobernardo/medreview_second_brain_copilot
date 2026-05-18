@@ -373,13 +373,12 @@ async function matchProductsByKeyword(
       .eq('category', 'produto')
       .eq('is_active', true)
       .or(orConditions)
-      .limit(2)
 
     if (vertical) {
       query = query.or(`vertical.eq.${vertical},vertical.is.null,vertical.eq.Geral`)
     }
 
-    const { data } = await query
+    const { data } = await query.limit(2)
     if (!data?.length) return
 
     const newDocs = data.filter((d: any) => !sources.some(s => s.id === d.id))
@@ -389,19 +388,15 @@ async function matchProductsByKeyword(
       .map((d: any) => `### ${d.title}${d.vertical ? ` (${d.vertical})` : ''}\n${d.content}`)
       .join('\n\n')
 
-    const kbIdx = parts.findIndex(p => p.startsWith('## Base de Conhecimento'))
-    if (kbIdx !== -1) {
-      parts[kbIdx] = parts[kbIdx] + '\n\n' + text
-    } else {
-      parts.push(`## Base de Conhecimento\n\n${text}`)
-    }
+    // Escreve na seção dedicada a produtos (será inserida no topo do contexto RAG)
+    parts.push(`## Produto\n\n${text}`)
 
     newDocs.forEach((d: any) => {
       if (!sources.some(s => s.id === d.id)) {
-        sources.push({ id: d.id, title: d.title, similarity: 0 })
+        sources.push({ id: d.id, title: d.title, similarity: 1 })
       }
     })
-    console.log(`[RAG] matchProductsByKeyword: found ${newDocs.length} product(s) via keyword`)
+    console.log(`[RAG] matchProductsByKeyword: ${newDocs.length} produto(s) encontrado(s) — ${newDocs.map((d: any) => d.title).join(', ')}`)
   } catch (err) {
     console.error('[RAG] matchProductsByKeyword failed:', err)
   }
@@ -416,6 +411,7 @@ export async function buildContext(
   userId?: string
 ): Promise<BuiltContext> {
   const supabase = getServiceClient()
+  const productParts: string[] = []
   const ragParts:   string[] = []
   const fixedParts: string[] = []
   const sources: ContextSource[] = []
@@ -443,6 +439,8 @@ export async function buildContext(
   }
 
   const extraCalls: Promise<void>[] = []
+  // Modo produto: produto vai para productParts (posição primária no contexto)
+  if (mode === 'produto') extraCalls.push(matchProductsByKeyword(supabase, message, productParts, sources, vertical))
   if (mode === 'objeção') extraCalls.push(matchObjections(supabase, embedding, ragParts, userId, vertical))
   if (['follow-up', 'proposta', 'copys'].includes(mode)) extraCalls.push(matchCopys(supabase, embedding, userId, ragParts, vertical))
   if (mode === 'proposta') extraCalls.push(matchQuotes(supabase, embedding, ragParts, vertical))
@@ -457,12 +455,9 @@ export async function buildContext(
     await fallbackTextSearch(supabase, message, ragParts, sources)
   }
 
-  // Para modo produto: busca direta por keyword no título caso o produto não tenha sido encontrado pelo vetor
-  if (mode === 'produto') {
-    await matchProductsByKeyword(supabase, message, ragParts, sources, vertical)
-  }
-
-  return { context: buildFinalContext(ragParts, fixedParts), sources, profile }
+  // Produto sempre primeiro no contexto RAG para o LLM priorizar
+  const allRagParts = [...productParts, ...ragParts]
+  return { context: buildFinalContext(allRagParts, fixedParts), sources, profile }
 }
 
 function buildFinalContext(ragParts: string[], fixedParts: string[]): string {
