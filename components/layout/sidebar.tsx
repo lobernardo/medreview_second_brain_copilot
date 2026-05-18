@@ -18,6 +18,7 @@ import {
   CalendarDays,
   Package,
   ClipboardCheck,
+  Users,
 } from 'lucide-react'
 
 import type { Profile } from '@/lib/utils/types'
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   { href: '/faq', label: 'FAQ', icon: HelpCircle, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/objecoes', label: 'Matriz de Objeções', icon: Shield, roles: ['closer', 'gestor'] },
   { href: '/kb', label: 'Knowledge Base', icon: BookOpen, roles: ['closer', 'gestor', 'onboarding'] },
+  { href: '/usuarios', label: 'Usuários', icon: Users, roles: ['gestor'] },
   { href: '/onboarding-acompanhamento', label: 'Acompanhamento', icon: ClipboardCheck, roles: ['gestor'] },
   { href: '/onboarding-config', label: 'Config Onboarding', icon: Settings2, roles: ['gestor'] },
   { href: '/settings', label: 'Configurações', icon: Settings, roles: ['closer', 'gestor', 'onboarding'] },
