@@ -35,7 +35,8 @@
       "Bash(Select-Object -Property Name, FullName)",
       "Bash(git mv *)",
       "Bash(curl *)",
-      "Bash(Start-Sleep -Seconds 70)"
+      "Bash(Start-Sleep -Seconds 70)",
+      "Bash(node *)"
     ]
   }
 }

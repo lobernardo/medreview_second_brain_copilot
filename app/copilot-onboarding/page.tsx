@@ -81,6 +81,32 @@ function useOnboardingConfig() {
   return { config, loading }
 }
 
+function postProgress(topic_index: number, topic_title: string, status: string) {
+  fetch('/api/onboarding-progress', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ topic_index, topic_title, status }),
+  }).catch(() => {})
+}
+
+function detectQuizQuestion(content: string, questions: string[]): string | null {
+  const lower = content.toLowerCase()
+  for (const q of questions) {
+    const fingerprint = q.toLowerCase().slice(0, 40)
+    if (fingerprint.length > 15 && lower.includes(fingerprint)) return q
+  }
+  return null
+}
+
+function detectCorrectness(content: string): boolean | null {
+  const lower = content.toLowerCase()
+  const positives = ['correto', 'acertou', 'exatamente', 'muito bem', 'boa resposta', 'isso mesmo', 'perfeito', 'ótimo', 'exato']
+  const negatives = ['não é bem', 'incompleto', 'não exatamente', 'errado', 'não está correto', 'precisa melhorar', 'não foi']
+  if (positives.some((p) => lower.includes(p)) && !negatives.some((n) => lower.includes(n))) return true
+  if (negatives.some((n) => lower.includes(n))) return false
+  return null
+}
+
 export default function CopilotOnboardingPage() {
   const userId = useSupabaseUser()
   const { config, loading } = useOnboardingConfig()
@@ -92,6 +118,8 @@ export default function CopilotOnboardingPage() {
   const [showContext, setShowContext] = useState(false)
   const [sources, setSources] = useState<Source[]>([])
   const [initialized, setInitialized] = useState(false)
+  const [awaitingQuiz, setAwaitingQuiz] = useState<{ question: string } | null>(null)
+  const progressInitRef = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -102,7 +130,15 @@ export default function CopilotOnboardingPage() {
       const welcome = getWelcomeMessage(config, profile?.name)
       setMessages([{ id: crypto.randomUUID(), role: 'assistant', content: welcome }])
     }
-  }, [loading, initialized, config])
+  }, [loading, initialized, config]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mark topic 0 as in_progress on first visit
+  useEffect(() => {
+    const topic = config?.trail?.[0]
+    if (!userId || !initialized || !topic || progressInitRef.current) return
+    progressInitRef.current = true
+    postProgress(0, topic.title, 'in_progress')
+  }, [userId, initialized, config])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -120,6 +156,9 @@ export default function CopilotOnboardingPage() {
       const text = (overrideText ?? input).trim()
       if (!text || streaming) return
 
+      // Capture quiz state before any state changes
+      const pendingQuiz = awaitingQuiz
+
       const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text }
       setMessages((prev) => [...prev, userMsg])
       setInput('')
@@ -128,6 +167,8 @@ export default function CopilotOnboardingPage() {
       const assistantId = crypto.randomUUID()
       setMessages((prev) => [...prev, { id: assistantId, role: 'assistant', content: '' }])
       setStreaming(true)
+
+      let accumulated = ''
 
       try {
         const history = messages
@@ -152,7 +193,6 @@ export default function CopilotOnboardingPage() {
         const reader = res.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
-        let accumulated = ''
 
         while (true) {
           const { done, value } = await reader.read()
@@ -182,6 +222,30 @@ export default function CopilotOnboardingPage() {
             } catch { /* non-JSON SSE line */ }
           }
         }
+
+        // Quiz tracking after streaming ends
+        const quizQuestions = config?.trail?.[currentTopicIndex]?.quiz_questions ?? []
+        if (pendingQuiz && userId) {
+          // User was answering a quiz — save result
+          const isCorrect = detectCorrectness(accumulated)
+          fetch('/api/onboarding-quiz', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              topic_index: currentTopicIndex,
+              topic_title: config?.trail?.[currentTopicIndex]?.title ?? '',
+              question: pendingQuiz.question,
+              user_answer: text,
+              is_correct: isCorrect,
+              copilot_feedback: accumulated,
+            }),
+          }).catch(() => {})
+          setAwaitingQuiz(null)
+        } else if (quizQuestions.length > 0) {
+          // Check if LLM is asking a quiz question
+          const detected = detectQuizQuestion(accumulated, quizQuestions)
+          if (detected) setAwaitingQuiz({ question: detected })
+        }
       } catch {
         setMessages((prev) =>
           prev.map((m) =>
@@ -194,7 +258,7 @@ export default function CopilotOnboardingPage() {
         setStreaming(false)
       }
     },
-    [input, messages, streaming, userId, currentTopicIndex]
+    [input, messages, streaming, userId, currentTopicIndex, awaitingQuiz, config]
   )
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -219,12 +283,17 @@ export default function CopilotOnboardingPage() {
 
   function advanceTopic() {
     const trail = config?.trail ?? []
-    if (currentTopicIndex < trail.length - 1) {
-      const nextIndex = currentTopicIndex + 1
-      setCurrentTopicIndex(nextIndex)
-      const nextTitle = trail[nextIndex]?.title ?? 'próximo tema'
-      sendMessage(`Vamos para o próximo tema: "${nextTitle}"`)
-    }
+    if (currentTopicIndex >= trail.length - 1) return
+    const nextIndex = currentTopicIndex + 1
+    const curTitle = trail[currentTopicIndex].title
+    const nextTitle = trail[nextIndex].title
+
+    postProgress(currentTopicIndex, curTitle, 'completed')
+    postProgress(nextIndex, nextTitle, 'in_progress')
+
+    setCurrentTopicIndex(nextIndex)
+    setAwaitingQuiz(null)
+    sendMessage(`Vamos para o próximo tema: "${nextTitle}"`)
   }
 
   const trail = config?.trail ?? []
@@ -257,10 +326,7 @@ export default function CopilotOnboardingPage() {
           {trail.length > 1 && (
             <div className="flex gap-1 mt-2 overflow-x-auto pb-0.5">
               {trail.map((t, i) => (
-                <div
-                  key={i}
-                  className="flex-shrink-0 flex items-center gap-1"
-                >
+                <div key={i} className="flex-shrink-0 flex items-center gap-1">
                   <div
                     className={`w-1.5 h-1.5 rounded-full transition-colors ${
                       i < currentTopicIndex
@@ -348,7 +414,6 @@ export default function CopilotOnboardingPage() {
                       <ThumbsDown size={12} />
                     </button>
 
-                    {/* Show "Próximo tema" only on last assistant message */}
                     {idx === messages.length - 1 && trail.length > 0 && !isLastTopic && (
                       <button
                         onClick={advanceTopic}
@@ -408,6 +473,11 @@ export default function CopilotOnboardingPage() {
 
       {/* Input */}
       <div className="flex-shrink-0 bg-white border-t px-4 py-3" style={{ borderColor: '#E5E7EB' }}>
+        {awaitingQuiz && (
+          <div className="mb-2 px-3 py-1.5 rounded-lg text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-100">
+            Quiz em andamento — responda a pergunta acima
+          </div>
+        )}
         <div
           className="flex items-end gap-2 bg-white border rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-200 transition-shadow"
           style={{ borderColor: '#E5E7EB' }}
