@@ -56,7 +56,7 @@ OPENAI_API_KEY=sk-...
 Usuário → Promise.all([VV+BigNumbers, ExamDates, Events, Embedding(msg), Profile])
         → detectVertical(msg) || profile.vertical_focus[0] || null  → vertical
         → Buscas vetoriais + keyword em paralelo:
-            matchProductsByKeyword  — só mode "produto" → productParts[] (PRIMÁRIO)
+            matchProductsByKeyword  — mode "produto" e "livre" → productParts[] (PRIMÁRIO)
             match_knowledge_base  (5 docs, 0.45)  — sempre → ragParts[]
             match_faq             (3 docs, 0.50)  — sempre → ragParts[]
             match_objections      (4 docs, 0.45)  — só mode "objeção"
@@ -73,8 +73,10 @@ Usuário → Promise.all([VV+BigNumbers, ExamDates, Events, Embedding(msg), Prof
         → System prompt → LLM streaming → SSE → cliente
 ```
 
-**Produto como fonte primária (mode `produto`):**
-`matchProductsByKeyword` usa keyword matching no título (`title ILIKE %keyword%`) com filtro `category='produto'` e `is_active=true`. Extrai keywords do message filtrando `STOP_WORDS` (conjunções, verbos genéricos, etc.) e palavras com < 4 chars. Popula `productParts[]` separado, colocado ANTES do `ragParts[]` no contexto. `similarity: 1` sinaliza prioridade. O system prompt instrui: seção `## Produto` é fonte primária e definitiva; FAQ e KB são complementares.
+**Produto como fonte primária (modes `produto` e `livre`):**
+`matchProductsByKeyword` usa keyword matching no título (`title ILIKE %keyword%`) com filtro `category='produto'` e `is_active=true`. Extrai keywords do message filtrando `STOP_WORDS` (conjunções, verbos genéricos, etc.) e palavras com < 4 chars. Matching é AND (todas as keywords devem estar no título) — evita false positives com palavras genéricas como "anest" que aparecem em todos os produtos da vertical. Popula `productParts[]` separado, colocado ANTES do `ragParts[]` no contexto. `similarity: 1` sinaliza prioridade. O system prompt instrui: seção `## Produto` é fonte primária e definitiva; FAQ e KB são complementares. **Ativo em `livre` para evitar respostas rasas/alucinações quando o closer pergunta sobre produto específico em modo livre.**
+
+**Variantes de produto (ex: ME1/ME2/ME3):** cada variante deve ser um documento KB separado com título distinto. Isso permite que o AND keyword matching encontre exatamente o documento certo ("extensivo anest me1" → só ME1, não ME2 ou ME3). Bônus específicos de uma variante (ex: "manual do residente físico" é bônus do ME) devem estar documentados somente no documento da variante correspondente.
 
 **Detecção de vertical (`lib/ai/context-builder.ts`):**
 ```typescript

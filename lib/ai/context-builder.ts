@@ -461,8 +461,9 @@ export async function buildContext(
   }
 
   const extraCalls: Promise<void>[] = []
-  // Modo produto: produto vai para productParts (posição primária no contexto)
-  if (mode === 'produto') extraCalls.push(matchProductsByKeyword(supabase, message, productParts, sources, vertical))
+  // Produto e livre: produto vai para productParts (posição primária no contexto)
+  // Livre inclui modo livre para evitar respostas rasas quando o closer pergunta sobre um produto específico
+  if (mode === 'produto' || mode === 'livre') extraCalls.push(matchProductsByKeyword(supabase, message, productParts, sources, vertical))
   if (mode === 'objeção') extraCalls.push(matchObjections(supabase, embedding, ragParts, userId, vertical))
   if (['follow-up', 'proposta', 'copys'].includes(mode)) extraCalls.push(matchCopys(supabase, embedding, userId, ragParts, vertical))
   if (mode === 'proposta') extraCalls.push(matchQuotes(supabase, embedding, ragParts, vertical))

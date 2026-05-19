@@ -46,6 +46,47 @@ Também conhecido como: EA, Extensivo TEA, Extensivo Anestesiologia.
 
 ---
 
+### 1.2b Variantes do mesmo produto — regra crítica
+
+Se um produto tem **variantes** (ex: Extensive Anest × Extensive Anest ME1, ME2 e ME3), cada variante deve ser um **documento separado na KB**, com título distinto.
+
+**Por quê isso importa:**
+
+O sistema busca produtos pelo título usando **AND** de keywords. Quando o closer pergunta "me fala sobre o Extensive ME1", o sistema extrai as keywords `["extensive", "me1"]` e busca documentos onde o título contenha AMBAS. Se ME1, ME2 e ME3 são o mesmo documento, a busca retorna o mesmo conteúdo para qualquer variante e o LLM não consegue distinguir bônus ou condições específicas de cada uma.
+
+**Exemplo correto:**
+
+```
+Documento 1: "Anest — Extensive Anest"
+  → Conteúdo: produto principal, o que é, para quem, entregáveis, pitch
+  → NÃO mencionar bônus que são exclusivos das variantes ME
+
+Documento 2: "Anest — Extensive Anest ME1"
+  → Conteúdo: variante para R1 no 1º ano, entregáveis específicos
+  → Mencionar: "Bônus exclusivo: Manual do Residente Físico (fascículo físico)"
+
+Documento 3: "Anest — Extensive Anest ME2"
+  → Conteúdo: variante para R1 no 2º ano, diferenças de carga horária, entregáveis específicos
+  → Mencionar: "Bônus exclusivo: Manual do Residente Físico (fascículo físico)"
+
+Documento 4: "Anest — Extensive Anest ME3"
+  → Conteúdo: variante para R1 no 3º ano (pré-TEA), ênfase em provas, entregáveis específicos
+  → Mencionar: "Bônus exclusivo: Manual do Residente Físico (fascículo físico)"
+```
+
+**Regra:** bônus, condições ou entregáveis exclusivos de uma variante só devem aparecer no documento daquela variante. Se aparecem no documento principal, o LLM pode mencionar o bônus ao falar do produto errado.
+
+**Como identificar se você precisa de documentos separados:**
+
+```
+Pergunta: "Se um closer perguntar sobre [Produto X] especificamente, a resposta seria diferente da de [Produto Y]?"
+
+Se SIM → documentos separados
+Se NÃO → podem ser o mesmo documento com uma seção de variantes
+```
+
+---
+
 ### 1.3 Template de produto — preencha campo a campo
 
 Copie este template, preencha com as informações reais do produto e cole no campo de conteúdo da KB.
