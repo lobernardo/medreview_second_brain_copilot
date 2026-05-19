@@ -365,14 +365,13 @@ async function matchProductsByKeyword(
 
     if (!keywords.length) return
 
-    const orConditions = keywords.map(w => `title.ilike.%${w}%`).join(',')
-
+    // AND: todas as keywords devem estar no título (evita false positives com words genéricas como "anest")
     let query = supabase
       .from('knowledge_base')
       .select('id, title, content, vertical')
       .eq('category', 'produto')
       .eq('is_active', true)
-      .or(orConditions)
+    keywords.forEach(kw => { query = query.ilike('title', `%${kw}%`) })
 
     if (vertical) {
       query = query.or(`vertical.eq.${vertical},vertical.is.null,vertical.eq.Geral`)
