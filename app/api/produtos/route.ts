@@ -2,33 +2,6 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-function buildContent(b: Record<string, string>): string {
-  const parts: string[] = [`# ${b.nome}`]
-
-  const meta: string[] = []
-  if (b.vertical) meta.push(`**Vertical:** ${b.vertical}`)
-  meta.push(`**Status:** ${b.status || 'ativo'}`)
-  if (b.reference_price) meta.push(`**Preço de referência:** ${b.reference_price}`)
-  if (meta.length) parts.push(meta.join(' | '))
-
-  if (b.recommended_icp?.trim()) parts.push(`**ICP recomendado:** ${b.recommended_icp.trim()}`)
-
-  const section = (heading: string, text: string) => {
-    if (text?.trim()) parts.push(`\n## ${heading}\n${text.trim()}`)
-  }
-
-  section('Descrição', b.description)
-  section('O que inclui', b.includes)
-  section('Pitch principal', b.main_pitch)
-  section('Condições comerciais', b.commercial_conditions)
-  section('Objeções comuns', b.common_objections)
-  section('Quando usar', b.when_to_use)
-  section('Quando NÃO usar', b.when_not_to_use)
-  section('Notas de estratégia', b.strategy_notes)
-
-  return parts.join('\n')
-}
-
 export async function GET() {
   try {
     const supabase = await createClient()
@@ -36,13 +9,32 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const admin = createAdminClient()
-    const { data, error } = await admin
+
+    const { data: products, error } = await admin
       .from('knowledge_base')
-      .select('id,title,category,vertical,content,tags,is_active,updated_at')
+      .select('id, title, vertical, content, tags, is_active, updated_at')
       .eq('category', 'produto')
       .eq('is_active', true)
       .order('updated_at', { ascending: false })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    const kbIds = (products ?? []).map(p => p.id)
+    let detailsMap: Record<string, unknown> = {}
+    if (kbIds.length > 0) {
+      const { data: details } = await admin
+        .from('product_details')
+        .select('*')
+        .in('kb_id', kbIds)
+      if (details) {
+        detailsMap = Object.fromEntries(details.map((d: Record<string, unknown>) => [d.kb_id as string, d]))
+      }
+    }
+
+    const data = (products ?? []).map(p => ({
+      ...p,
+      commercial: detailsMap[p.id] ?? null,
+    }))
+
     return NextResponse.json({ data })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
@@ -56,32 +48,42 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
-    const { id } = body
+    const { kb_id, icp, pitch, commercial_copy, price, access_duration,
+            payment_conditions, when_to_use, when_not_to_use, objections, strategy_notes } = body
 
-    const content = buildContent(body)
-    const status = body.status || 'ativo'
-
-    const record = {
-      title: String(body.nome).trim(),
-      category: 'produto' as const,
-      vertical: body.vertical || null,
-      content,
-      tags: [status],
-      source_type: 'texto' as const,
-      is_active: true,
-      updated_at: new Date().toISOString(),
-      updated_by: user.id,
-    }
+    if (!kb_id) return NextResponse.json({ error: 'kb_id required' }, { status: 400 })
 
     const admin = createAdminClient()
-    if (id) {
-      const { error } = await admin.from('knowledge_base').update(record).eq('id', id)
+
+    const { data: existing } = await admin
+      .from('product_details')
+      .select('id')
+      .eq('kb_id', kb_id)
+      .maybeSingle()
+
+    const payload = {
+      kb_id,
+      icp:                 icp                 ?? null,
+      pitch:               pitch               ?? null,
+      commercial_copy:     commercial_copy     ?? null,
+      price:               price               ?? null,
+      access_duration:     access_duration     ?? null,
+      payment_conditions:  payment_conditions  ?? null,
+      when_to_use:         when_to_use         ?? null,
+      when_not_to_use:     when_not_to_use     ?? null,
+      objections:          objections          ?? null,
+      strategy_notes:      strategy_notes      ?? null,
+      updated_at:          new Date().toISOString(),
+    }
+
+    if (existing) {
+      const { error } = await admin.from('product_details').update(payload).eq('id', existing.id)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      return NextResponse.json({ success: true, data: { id, content } })
+      return NextResponse.json({ success: true, data: { id: existing.id } })
     } else {
-      const { data, error } = await admin.from('knowledge_base').insert(record).select('id').single()
+      const { data, error } = await admin.from('product_details').insert(payload).select('id').single()
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      return NextResponse.json({ success: true, data: { id: data.id, content } })
+      return NextResponse.json({ success: true, data })
     }
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

@@ -204,6 +204,11 @@ onboarding_config (id, trail, custom_instructions, welcome_message, tone,
                    max_complexity, focus_verticals)
                   -- singleton; trail é array de strings com os temas da trilha
 
+product_details     (id, kb_id[→knowledge_base.id], icp, pitch, commercial_copy, price,
+                     access_duration, payment_conditions, when_to_use, when_not_to_use,
+                     objections, strategy_notes, updated_at)
+                     -- kb_id UNIQUE; complementa knowledge_base sem tocar content
+
 onboarding_progress (id, user_id, topic_index, topic_title, status[in_progress|completed],
                      started_at, completed_at)
 
@@ -306,10 +311,15 @@ Categoria `tecnica-comercial` alimenta o Insight do Dia na Home e é indexada no
 Seção 1: Provas & Datas com countdown colorido. Campo `monday_item_id` (URL Monday clicável).
 Seção 2: Calendário de eventos agrupado por mês. Multi-select verticais.
 
-### 9.11 Catálogo de Produtos (`/produtos`) — todos (gestor edita)
-Apenas edição de produtos existentes. **Não há botão "Novo produto"** — toda inserção de produto é feita via Knowledge Base (`/kb`) com `category = 'produto'`.
-Form estruturado (13 campos) → `buildContent()` gera Markdown completo → salvo em `knowledge_base` com `category='produto'`, `tags[0]=status`.
-**Embedding usa o `content` completo** (Markdown com todos os campos: ICP, pitch, objeções, condições, quando usar, etc.) — o `POST /api/produtos` retorna `{ id, content }` e o client usa `json.data.content` para a chamada ao `/api/embeddings`.
+### 9.11 Catálogo de Produtos (`/produtos`) — todos (gestor edita dados comerciais)
+Exibe todos os produtos da Knowledge Base (`category='produto'`). **Não há criação de produto aqui** — toda inserção é feita via `/kb`.
+
+**Arquitetura de duas camadas:**
+- **KB** (`knowledge_base.content`) → fonte de verdade do conteúdo: o que é o produto, metodologia, o que inclui, diferenciais. Gerado/editado apenas pela Knowledge Base. O embedding representa esse conteúdo.
+- **`product_details`** → camada comercial complementar: ICP, pitch, preço, tempo de acesso, condições de pagamento, quando indicar, quando NÃO indicar, objeções + respostas, copy comercial, notas de estratégia. Linked ao `knowledge_base` via `kb_id`.
+
+O botão "Editar" (gestor) abre formulário com **apenas os campos de `product_details`** — nunca toca o `content` do KB.
+O RAG (`matchProductsByKeyword`) busca o `content` do KB e faz JOIN com `product_details`, montando contexto completo: conteúdo educacional + bloco "— Dados Comerciais —".
 
 ### 9.12 Configurações (`/settings`) — todos
 Dados pessoais + `vertical_focus` (multi-select chips, salvo como string "R1,Anest"). Style Wizard 5 passos (Tom, Emoji, Tratamento, Encerramento, Exemplo) → `style_notes`. Salva via `PATCH /api/profile`.
@@ -366,7 +376,7 @@ Drill-down por colaborador via `GET /api/onboarding-acompanhamento/[userId]`.
 | `/api/user-objection-responses` | POST/DELETE | respostas pessoais de objeções |
 | `/api/exam-dates` | GET/POST/DELETE | exam_dates |
 | `/api/events` | GET/POST/DELETE | company_events |
-| `/api/produtos` | GET/POST/DELETE | knowledge_base WHERE category='produto' — POST retorna `{ id, content }` |
+| `/api/produtos` | GET/POST/DELETE | GET: knowledge_base WHERE category='produto' + JOIN product_details; POST: upsert product_details por kb_id (nunca toca knowledge_base.content); DELETE: is_active=false em knowledge_base |
 | `/api/onboarding-config` | GET/POST | GET: qualquer auth; POST: só gestor — upsert onboarding_config |
 | `/api/onboarding-progress` | GET/POST | Progresso por tema do usuário autenticado |
 | `/api/onboarding-quiz` | GET/POST | Resultados de quiz — GET aceita `?user_id=` (gestor pode ver outros) |
@@ -457,6 +467,7 @@ Chat user: `bg-[#EEF2FF] rounded-2xl` (direita) | Chat copilot: `bg-white border
 | 8.11 | RAG: user_objection_responses no contexto de objeções; prompt com bloco "CONTEXTO QUE VOCÊ RECEBE"; home reordenada | ✅ |
 | 8.12 | Correções RAG: embedding produto (content completo), whatsapp_templates na allowlist, filtro vertical nas 5 RPCs, detectVertical(), truncate separado (8k RAG + 4k fixo), ordem RAG-primeiro, catches com console.error, FAQ categories select, FAQ score no contexto, FAQ priorizado >80%, categoria tecnica-comercial na KB, Insight do Dia na Home, Próximas Provas na Home | ✅ |
 | 8.13 | Onboarding fases B+C (tracking de progresso + quiz + painel do gestor), gestão de usuários com proteção auto-rebaixamento, onboarding-config via API route (fix RLS), ativação de colaboradores por role, auth no copilot-onboarding, process-document verbatim, produto como fonte primária no RAG (matchProductsByKeyword paralelo + productParts[]), remoção do botão "Novo produto" | ✅ |
+| 8.14 | Arquitetura KB+Comercial: tabela product_details separada; /produtos exibe KB e edita apenas dados comerciais; matchProductsByKeyword usa AND (não OR) e faz JOIN com product_details para enriquecer contexto RAG; API /api/produtos reescrita para nunca tocar knowledge_base.content | ✅ |
 | 9 | Seed — importar docs reais (produtos, técnicas comerciais, playbooks) + embeddings | ⏳ |
 | 10 | Polish final + Deploy Vercel | ⏳ |
 

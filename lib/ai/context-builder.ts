@@ -383,11 +383,34 @@ async function matchProductsByKeyword(
     const newDocs = data.filter((d: any) => !sources.some(s => s.id === d.id))
     if (!newDocs.length) return
 
-    const text = newDocs
-      .map((d: any) => `### ${d.title}${d.vertical ? ` (${d.vertical})` : ''}\n${d.content}`)
-      .join('\n\n')
+    // Busca dados comerciais em product_details para enriquecer o contexto
+    const kbIds = newDocs.map((d: any) => d.id)
+    const { data: details } = await supabase
+      .from('product_details')
+      .select('kb_id, icp, pitch, price, access_duration, payment_conditions, when_to_use, when_not_to_use, objections')
+      .in('kb_id', kbIds)
+    const detailsMap: Record<string, any> = {}
+    if (details) details.forEach((d: any) => { detailsMap[d.kb_id] = d })
 
-    // Escreve na seção dedicada a produtos (será inserida no topo do contexto RAG)
+    const text = newDocs.map((d: any) => {
+      let block = `### ${d.title}${d.vertical ? ` (${d.vertical})` : ''}\n${d.content}`
+      const det = detailsMap[d.id]
+      if (det) {
+        const commercial: string[] = []
+        if (det.icp)                commercial.push(`**ICP:** ${det.icp}`)
+        if (det.price)              commercial.push(`**Preço:** ${det.price}`)
+        if (det.access_duration)    commercial.push(`**Acesso:** ${det.access_duration}`)
+        if (det.payment_conditions) commercial.push(`**Condições:** ${det.payment_conditions}`)
+        if (det.pitch)              commercial.push(`**Pitch:** "${det.pitch}"`)
+        if (det.when_to_use)        commercial.push(`**Quando indicar:** ${det.when_to_use}`)
+        if (det.when_not_to_use)    commercial.push(`**Quando NÃO indicar:** ${det.when_not_to_use}`)
+        if (det.objections)         commercial.push(`**Objeções:** ${det.objections}`)
+        if (commercial.length) block += `\n\n**— Dados Comerciais —**\n${commercial.join('\n')}`
+      }
+      return block
+    }).join('\n\n')
+
+    // Produto primeiro no contexto RAG
     parts.push(`## Produto\n\n${text}`)
 
     newDocs.forEach((d: any) => {
@@ -395,7 +418,7 @@ async function matchProductsByKeyword(
         sources.push({ id: d.id, title: d.title, similarity: 1 })
       }
     })
-    console.log(`[RAG] matchProductsByKeyword: ${newDocs.length} produto(s) encontrado(s) — ${newDocs.map((d: any) => d.title).join(', ')}`)
+    console.log(`[RAG] matchProductsByKeyword: ${newDocs.length} produto(s) — ${newDocs.map((d: any) => d.title).join(', ')}`)
   } catch (err) {
     console.error('[RAG] matchProductsByKeyword failed:', err)
   }
