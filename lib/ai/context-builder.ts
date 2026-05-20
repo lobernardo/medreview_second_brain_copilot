@@ -342,11 +342,30 @@ async function fallbackTextSearch(
 }
 
 const STOP_WORDS = new Set([
-  'com', 'por', 'uma', 'um', 'que', 'para', 'sobre', 'falar', 'gerar', 'mais',
-  'como', 'seu', 'sua', 'dos', 'das', 'nos', 'nas', 'num', 'numa', 'este',
-  'essa', 'esse', 'isto', 'isso', 'aqui', 'ali', 'quando', 'onde', 'qual',
-  'quem', 'copy', 'copys', 'texto', 'fazer', 'quero', 'pedir', 'dizer', 'ver',
-  'pode', 'preciso', 'favor', 'obrigado', 'boa', 'bom', 'certo',
+  // preposições / artigos / pronomes
+  'com', 'por', 'uma', 'um', 'que', 'para', 'sobre', 'mais', 'como', 'seu',
+  'sua', 'dos', 'das', 'nos', 'nas', 'num', 'numa', 'este', 'esta', 'essa',
+  'esse', 'isto', 'isso', 'aqui', 'ali', 'quando', 'onde', 'qual', 'quais',
+  'quem', 'meu', 'minha', 'meus', 'suas', 'seus', 'nosso', 'nossa', 'nossos',
+  'nossas', 'outro', 'outra', 'outros', 'outras', 'mesmo', 'mesma',
+  // verbos comuns que não são nomes de produto
+  'falar', 'gerar', 'fazer', 'quero', 'pedir', 'dizer', 'ver', 'pode',
+  'funciona', 'funcionar', 'passar', 'passando', 'repassar', 'explicar',
+  'explica', 'entender', 'entendo', 'entende', 'contar', 'mostrar', 'mostra',
+  'saber', 'seria', 'seriam', 'tenho', 'temos', 'ajuda', 'ajudar', 'usar',
+  'usei', 'utilizar', 'precisa', 'preciso', 'consegue', 'conseguir', 'queria',
+  'quer', 'resumir', 'resumo', 'detalhar', 'detalhe', 'listar', 'listar',
+  'vender', 'vendo', 'fechar', 'fecha', 'apresentar',
+  // substantivos genéricos do contexto comercial
+  'lead', 'leads', 'cliente', 'clientes', 'aluno', 'alunos', 'médico',
+  'medico', 'valor', 'custo', 'investimento', 'mensagem', 'texto', 'copy',
+  'copys', 'informação', 'informacao', 'conteúdo', 'conteudo',
+  // advérbios / conectores
+  'muito', 'muita', 'muitos', 'muitas', 'ainda', 'também', 'talvez',
+  'sempre', 'nunca', 'hoje', 'agora', 'depois', 'antes', 'além', 'dentro',
+  'fora', 'apenas', 'somente', 'então', 'assim', 'tipo', 'porque', 'junto',
+  // outros
+  'favor', 'obrigado', 'boa', 'bom', 'certo', 'novo', 'nova', 'novos',
 ])
 
 async function matchProductsByKeyword(
@@ -366,18 +385,25 @@ async function matchProductsByKeyword(
     if (!keywords.length) return
 
     // AND: todas as keywords devem estar no título (evita false positives com words genéricas como "anest")
-    let query = supabase
-      .from('knowledge_base')
-      .select('id, title, content, vertical, category')
-      .in('category', ['produto', 'feature'])
-      .eq('is_active', true)
-    keywords.forEach(kw => { query = query.ilike('title', `%${kw}%`) })
-
-    if (vertical) {
-      query = query.or(`vertical.eq.${vertical},vertical.is.null,vertical.eq.Geral`)
+    // Se não achar, relaxa progressivamente removendo a última keyword até sobrar mínimo 2
+    const runQuery = async (kws: string[]) => {
+      let q = supabase
+        .from('knowledge_base')
+        .select('id, title, content, vertical, category')
+        .in('category', ['produto', 'feature'])
+        .eq('is_active', true)
+      kws.forEach(kw => { q = q.ilike('title', `%${kw}%`) })
+      if (vertical) q = q.or(`vertical.eq.${vertical},vertical.is.null,vertical.eq.Geral`)
+      const { data } = await q.limit(2)
+      return data
     }
 
-    const { data } = await query.limit(2)
+    let data = await runQuery(keywords)
+    if (!data?.length && keywords.length > 2) {
+      for (let n = keywords.length - 1; n >= 2 && !data?.length; n--) {
+        data = await runQuery(keywords.slice(0, n))
+      }
+    }
     if (!data?.length) return
 
     const newDocs = data.filter((d: any) => !sources.some(s => s.id === d.id))
@@ -466,7 +492,7 @@ export async function buildContext(
   // Livre inclui modo livre para evitar respostas rasas quando o closer pergunta sobre um produto específico
   if (mode === 'produto' || mode === 'livre') extraCalls.push(matchProductsByKeyword(supabase, message, productParts, sources, vertical))
   if (mode === 'objeção') extraCalls.push(matchObjections(supabase, embedding, ragParts, userId, vertical))
-  if (['follow-up', 'proposta', 'copys'].includes(mode)) extraCalls.push(matchCopys(supabase, embedding, userId, ragParts, vertical))
+  if (['follow-up', 'proposta', 'copys', 'livre', 'produto'].includes(mode)) extraCalls.push(matchCopys(supabase, embedding, userId, ragParts, vertical))
   if (mode === 'proposta') extraCalls.push(matchQuotes(supabase, embedding, ragParts, vertical))
 
   const [kbFound] = await Promise.all([
