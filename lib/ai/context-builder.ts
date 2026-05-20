@@ -368,8 +368,8 @@ async function matchProductsByKeyword(
     // AND: todas as keywords devem estar no título (evita false positives com words genéricas como "anest")
     let query = supabase
       .from('knowledge_base')
-      .select('id, title, content, vertical')
-      .eq('category', 'produto')
+      .select('id, title, content, vertical, category')
+      .in('category', ['produto', 'feature'])
       .eq('is_active', true)
     keywords.forEach(kw => { query = query.ilike('title', `%${kw}%`) })
 
@@ -410,15 +410,16 @@ async function matchProductsByKeyword(
       return block
     }).join('\n\n')
 
-    // Produto primeiro no contexto RAG
-    parts.push(`## Produto\n\n${text}`)
+    // Produto/Feature primeiro no contexto RAG
+    const sectionLabel = newDocs.every((d: any) => d.category === 'feature') ? 'Feature' : 'Produto'
+    parts.push(`## ${sectionLabel}\n\n${text}`)
 
     newDocs.forEach((d: any) => {
       if (!sources.some(s => s.id === d.id)) {
         sources.push({ id: d.id, title: d.title, similarity: 1 })
       }
     })
-    console.log(`[RAG] matchProductsByKeyword: ${newDocs.length} produto(s) — ${newDocs.map((d: any) => d.title).join(', ')}`)
+    console.log(`[RAG] matchProductsByKeyword: ${newDocs.length} item(s) — ${newDocs.map((d: any) => d.title).join(', ')}`)
   } catch (err) {
     console.error('[RAG] matchProductsByKeyword failed:', err)
   }

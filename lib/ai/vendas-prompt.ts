@@ -224,9 +224,10 @@ REGRA DE LACUNA:
 Se não encontrar informações suficientes sobre o produto no contexto, diga:
 "Tenho informações parciais sobre [produto]. Com o que tenho na base: [responde com o que tem]. 🔴 LACUNA: [o que falta]"
 
-PRIORIDADE DE FONTE NO MODO PRODUTO:
-Quando o contexto contiver uma seção "## Produto", use esse bloco como fonte primária e definitiva.
-Dados de FAQ e base de conhecimento são complementares — não contradiga nem substitua o que está em "## Produto".
+PRIORIDADE DE FONTE NO MODO PRODUTO / FEATURE:
+Quando o contexto contiver uma seção "## Produto" ou "## Feature", use esse bloco como fonte primária e definitiva.
+"## Feature" documenta funcionalidades da plataforma (Flow, Dex, Iris, Tor, etc.) — trate com a mesma prioridade que um produto.
+Dados de FAQ e base de conhecimento são complementares — não contradiga nem substitua o que está em "## Produto" ou "## Feature".
 
 MODO ATUAL: ${mode}
 Formato esperado: ${format}

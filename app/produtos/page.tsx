@@ -30,6 +30,7 @@ interface CommercialDetails {
 interface Product {
   id: string
   title: string
+  category: string
   vertical: string | null
   content: string
   tags: string[]
@@ -96,6 +97,7 @@ export default function ProdutosPage() {
 
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [filterCategory, setFilterCategory] = useState<'' | 'produto' | 'feature'>('')
   const [filterVertical, setFilterVertical] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
 
@@ -125,11 +127,12 @@ export default function ProdutosPage() {
   // ── Filtered ──
   const filtered = useMemo(() => {
     return products.filter(p => {
+      if (filterCategory && p.category !== filterCategory) return false
       if (filterVertical && p.vertical !== filterVertical) return false
       if (filterStatus && getProductStatus(p.tags) !== filterStatus) return false
       return true
     })
-  }, [products, filterVertical, filterStatus])
+  }, [products, filterCategory, filterVertical, filterStatus])
 
   // ── Handlers ──
   function openDetail(p: Product) {
@@ -214,24 +217,46 @@ export default function ProdutosPage() {
     <div className="max-w-5xl mx-auto px-4 py-6">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div className="flex items-center gap-2">
-          <Package size={20} className="text-[#6366F1]" strokeWidth={1.5} />
-          <h2 className="text-base font-semibold text-[#111827]">Catálogo de Produtos</h2>
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Package size={20} className="text-[#6366F1]" strokeWidth={1.5} />
+            <h2 className="text-base font-semibold text-[#111827]">Catálogo de Produtos</h2>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select value={filterVertical} onChange={e => setFilterVertical(e.target.value)}
+              className="border border-[#E5E7EB] rounded-lg px-3 py-1.5 text-sm text-[#374151] bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">Todas as verticais</option>
+              {VERTICALS.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+              className="border border-[#E5E7EB] rounded-lg px-3 py-1.5 text-sm text-[#374151] bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">Todos os status</option>
+              <option value="ativo">Ativo</option>
+              <option value="inativo">Inativo</option>
+              <option value="beta">Beta</option>
+            </select>
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <select value={filterVertical} onChange={e => setFilterVertical(e.target.value)}
-            className="border border-[#E5E7EB] rounded-lg px-3 py-1.5 text-sm text-[#374151] bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option value="">Todas as verticais</option>
-            {VERTICALS.map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-            className="border border-[#E5E7EB] rounded-lg px-3 py-1.5 text-sm text-[#374151] bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option value="">Todos os status</option>
-            <option value="ativo">Ativo</option>
-            <option value="inativo">Inativo</option>
-            <option value="beta">Beta</option>
-          </select>
+
+        {/* Category tabs */}
+        <div className="flex gap-1 p-1 bg-[#F3F4F6] rounded-xl w-fit">
+          {([
+            { value: '',        label: 'Todos' },
+            { value: 'produto', label: 'Produtos & Ofertas' },
+            { value: 'feature', label: 'Features' },
+          ] as const).map(tab => (
+            <button
+              key={tab.value}
+              onClick={() => setFilterCategory(tab.value)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                filterCategory === tab.value
+                  ? 'bg-white text-[#111827] shadow-sm'
+                  : 'text-[#6B7280] hover:text-[#374151]'
+              }`}>
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -241,7 +266,7 @@ export default function ProdutosPage() {
       ) : filtered.length === 0 ? (
         <div className="bg-white border border-[#E5E7EB] rounded-xl p-10 text-center text-[#9CA3AF] text-sm">
           {products.length === 0
-            ? "Nenhum produto cadastrado. Adicione produtos na Knowledge Base com categoria 'produto'."
+            ? "Nenhum item cadastrado. Adicione produtos na Knowledge Base com categoria 'produto' ou 'feature'."
             : 'Nenhum resultado para os filtros selecionados.'}
         </div>
       ) : (
@@ -264,8 +289,14 @@ export default function ProdutosPage() {
                   </span>
                 </div>
 
-                {/* Vertical + price */}
+                {/* Vertical + category badge + price */}
                 <div className="flex items-center gap-2 flex-wrap">
+                  {p.category === 'feature' && (
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                      style={{ color: '#14B8A6', background: '#F0FDFA' }}>
+                      Feature
+                    </span>
+                  )}
                   {p.vertical && <VerticalBadge vertical={p.vertical} />}
                   {p.commercial?.price && (
                     <span className="text-xs text-[#6B7280] font-medium">{p.commercial.price}</span>
@@ -580,8 +611,8 @@ export default function ProdutosPage() {
       {confirmDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-            <p className="text-sm font-medium text-[#111827]">Remover este produto?</p>
-            <p className="text-xs text-[#6B7280]">O produto ficará inativo e não aparecerá mais no catálogo nem no RAG.</p>
+            <p className="text-sm font-medium text-[#111827]">Remover este item?</p>
+            <p className="text-xs text-[#6B7280]">O item ficará inativo e não aparecerá mais no catálogo nem no RAG.</p>
             <div className="flex gap-3">
               <button onClick={() => handleDelete(confirmDeleteId)}
                 className="flex-1 px-4 py-2 bg-[#EF4444] hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors">

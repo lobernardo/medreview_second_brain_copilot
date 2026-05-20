@@ -1,7 +1,7 @@
 # CLAUDE.md — Second Brain Med-Review
 
 > **Fonte de verdade do projeto. Leia antes de qualquer tarefa.**
-> **Versão:** 8.0 | Data: 18/05/2026
+> **Versão:** 8.1 | Data: 20/05/2026
 
 ---
 
@@ -184,7 +184,7 @@ profiles          (id, name, role[closer|gestor|onboarding], vertical_focus, pho
                    whatsapp_link, default_greeting, style_notes)
 
 knowledge_base    (id, title, content, category, vertical, tags, source_type, is_active, embedding)
-                  categories: produto|playbook|tecnica-comercial|objeção-resposta|regra-comercial|
+                  categories: produto|feature|playbook|tecnica-comercial|objeção-resposta|regra-comercial|
                               diferencial|faq|template-followup|case-sucesso|script-copy
 
 objection_patterns(id, topic, definition, real_meaning, vertical, recommended_response,
@@ -314,7 +314,9 @@ Seção 1: Provas & Datas com countdown colorido. Campo `monday_item_id` (URL Mo
 Seção 2: Calendário de eventos agrupado por mês. Multi-select verticais.
 
 ### 9.11 Catálogo de Produtos (`/produtos`) — todos (gestor edita dados comerciais)
-Exibe todos os produtos da Knowledge Base (`category='produto'`). **Não há criação de produto aqui** — toda inserção é feita via `/kb`.
+Exibe todos os produtos e features da Knowledge Base (`category='produto'` ou `category='feature'`). **Não há criação de produto/feature aqui** — toda inserção é feita via `/kb`.
+
+**Features** (Flow, Dex, Iris, Tor, etc.): funcionalidades da plataforma Med-Review cadastradas como `category='feature'` no KB. Seguem o mesmo padrão de duas camadas dos produtos (KB content + product_details comercial). Na página `/produtos`, aparecem com badge "Feature" e são filtráveis via tab "Features". No RAG, o `matchProductsByKeyword` busca tanto `produto` quanto `feature` e os coloca como seção `## Produto` ou `## Feature` (fonte primária no contexto).
 
 **Arquitetura de duas camadas:**
 - **KB** (`knowledge_base.content`) → fonte de verdade do conteúdo: o que é o produto, metodologia, o que inclui, diferenciais. Gerado/editado apenas pela Knowledge Base. O embedding representa esse conteúdo.
@@ -378,7 +380,7 @@ Drill-down por colaborador via `GET /api/onboarding-acompanhamento/[userId]`.
 | `/api/user-objection-responses` | POST/DELETE | respostas pessoais de objeções |
 | `/api/exam-dates` | GET/POST/DELETE | exam_dates |
 | `/api/events` | GET/POST/DELETE | company_events |
-| `/api/produtos` | GET/POST/DELETE | GET: knowledge_base WHERE category='produto' + JOIN product_details; POST: upsert product_details por kb_id (nunca toca knowledge_base.content); DELETE: is_active=false em knowledge_base |
+| `/api/produtos` | GET/POST/DELETE | GET: knowledge_base WHERE category IN ('produto','feature') + JOIN product_details; POST: upsert product_details por kb_id (nunca toca knowledge_base.content); DELETE: is_active=false em knowledge_base |
 | `/api/onboarding-config` | GET/POST | GET: qualquer auth; POST: só gestor — upsert onboarding_config |
 | `/api/onboarding-progress` | GET/POST | Progresso por tema do usuário autenticado |
 | `/api/onboarding-quiz` | GET/POST | Resultados de quiz — GET aceita `?user_id=` (gestor pode ver outros) |
@@ -470,6 +472,7 @@ Chat user: `bg-[#EEF2FF] rounded-2xl` (direita) | Chat copilot: `bg-white border
 | 8.12 | Correções RAG: embedding produto (content completo), whatsapp_templates na allowlist, filtro vertical nas 5 RPCs, detectVertical(), truncate separado (8k RAG + 4k fixo), ordem RAG-primeiro, catches com console.error, FAQ categories select, FAQ score no contexto, FAQ priorizado >80%, categoria tecnica-comercial na KB, Insight do Dia na Home, Próximas Provas na Home | ✅ |
 | 8.13 | Onboarding fases B+C (tracking de progresso + quiz + painel do gestor), gestão de usuários com proteção auto-rebaixamento, onboarding-config via API route (fix RLS), ativação de colaboradores por role, auth no copilot-onboarding, process-document verbatim, produto como fonte primária no RAG (matchProductsByKeyword paralelo + productParts[]), remoção do botão "Novo produto" | ✅ |
 | 8.14 | Arquitetura KB+Comercial: tabela product_details separada; /produtos exibe KB e edita apenas dados comerciais; matchProductsByKeyword usa AND (não OR) e faz JOIN com product_details para enriquecer contexto RAG; API /api/produtos reescrita para nunca tocar knowledge_base.content | ✅ |
+| 8.15 | Categoria `feature` no KB: Flow, Dex, Iris, Tor e outras features da plataforma seguem o mesmo padrão produto (KB content + product_details); /produtos com tabs Todos/Produtos/Features; badge "Feature" nos cards; matchProductsByKeyword inclui category='feature'; system prompt atualizado para reconhecer `## Feature` como fonte primária | ✅ |
 | 9 | Seed — importar docs reais (produtos, técnicas comerciais, playbooks) + embeddings | ⏳ |
 | 10 | Polish final + Deploy Vercel | ⏳ |
 

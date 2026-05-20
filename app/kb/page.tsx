@@ -16,6 +16,7 @@ import { useProfile } from '@/lib/context/profile-context'
 
 const KB_CATEGORIES = [
   { value: 'produto',            label: 'Produto',              color: '#3B82F6', bg: '#EFF6FF' },
+  { value: 'feature',            label: 'Feature',              color: '#14B8A6', bg: '#F0FDFA' },
   { value: 'playbook',           label: 'Playbook',             color: '#8B5CF6', bg: '#F5F3FF' },
   { value: 'tecnica-comercial',  label: 'Técnica Comercial',    color: '#D97706', bg: '#FEF3C7' },
   { value: 'objeção-resposta',   label: 'Objeção & Resposta',   color: '#F59E0B', bg: '#FFFBEB' },

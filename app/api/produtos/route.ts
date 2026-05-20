@@ -12,8 +12,8 @@ export async function GET() {
 
     const { data: products, error } = await admin
       .from('knowledge_base')
-      .select('id, title, vertical, content, tags, is_active, updated_at')
-      .eq('category', 'produto')
+      .select('id, title, category, vertical, content, tags, is_active, updated_at')
+      .in('category', ['produto', 'feature'])
       .eq('is_active', true)
       .order('updated_at', { ascending: false })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
