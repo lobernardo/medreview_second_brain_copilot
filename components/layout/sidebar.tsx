@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
   { href: '/', label: 'Home', icon: LayoutDashboard, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/copilot-vendas', label: 'Copilot Vendas', icon: Bot, roles: ['closer', 'gestor'] },
   { href: '/copilot-onboarding', label: 'Copilot Onboarding', icon: GraduationCap, roles: ['onboarding', 'gestor'] },
-  { href: '/verdadeiro-valor', label: 'Verdadeiro Valor', icon: Trophy, roles: ['closer', 'gestor', 'onboarding'] },
+  { href: '/verdadeiro-valor', label: 'PUV', icon: Trophy, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/agenda', label: 'Agenda', icon: CalendarDays, roles: ['closer', 'gestor', 'onboarding'] },
   { href: '/leads', label: 'No Radar', icon: NotebookPen, roles: ['closer', 'gestor'] },
   { href: '/copys', label: 'Copys', icon: Mail, roles: ['closer', 'gestor'] },
